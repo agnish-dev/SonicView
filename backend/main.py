@@ -118,6 +118,8 @@ async def get_stream(video_id: str, title: Optional[str] = None, artist: Optiona
             'extractor_args': {'youtube': {'client': ['tv_embedded', 'web_creator', 'android', 'ios']}},
             'js_runtimes': {'node': {}}
         }
+        if os.path.exists('cookies.txt'):
+            ydl_opts['cookiefile'] = 'cookies.txt'
         
         # 1. Fetch skip segments from SponsorBlock
         skip_segments = []
@@ -140,7 +142,11 @@ async def get_stream(video_id: str, title: Optional[str] = None, artist: Optiona
         # 2. Extract stream URL
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
-            url = info['url']
+            url = info.get('url')
+            if not url and 'requested_formats' in info:
+                url = info['requested_formats'][0]['url']
+            elif not url and 'formats' in info:
+                url = info['formats'][-1]['url']
             return {"stream_url": url, "skip_segments": skip_segments}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -274,6 +280,8 @@ async def analyze_track(track: TrackRequest):
             'extractor_args': {'youtube': {'client': ['tv_embedded', 'web_creator', 'android', 'ios']}},
             'js_runtimes': {'node': {}}
         }
+        if os.path.exists('cookies.txt'):
+            ydl_opts['cookiefile'] = 'cookies.txt'
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([f"https://www.youtube.com/watch?v={track.id}"])
