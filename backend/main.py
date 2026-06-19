@@ -115,6 +115,8 @@ async def get_stream(video_id: str, title: Optional[str] = None, artist: Optiona
             'format': 'bestaudio/best',
             'quiet': True,
             'no_warnings': True,
+            'extractor_args': {'youtube': {'client': ['android', 'ios']}},
+            'js_runtimes': {'node': {}}
         }
         
         # 1. Fetch skip segments from SponsorBlock
@@ -268,7 +270,9 @@ async def analyze_track(track: TrackRequest):
             'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'm4a'}],
             'quiet': True,
             'no_warnings': True,
-            'ffmpeg_location': ffmpeg_path
+            'ffmpeg_location': ffmpeg_path,
+            'extractor_args': {'youtube': {'client': ['android', 'ios']}},
+            'js_runtimes': {'node': {}}
         }
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
