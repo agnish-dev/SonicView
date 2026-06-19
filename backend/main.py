@@ -82,18 +82,20 @@ def format_track(item):
         "preview_url": ""
     }
 
-def decrypt_jiosaavn_url(url: str) -> str:
+def decrypt_jiosaavn_url(url: str, high_quality: bool = True) -> str:
     try:
         des_cipher = DES.new(b'38346591', DES.MODE_ECB)
         enc_url = base64.b64decode(url.strip())
         dec_url = des_cipher.decrypt(enc_url)
         dec_url = dec_url.decode('utf-8').rstrip('\0')
-        return dec_url.replace('_96_p.mp4', '_320_p.mp4').replace('_96_p.m4a', '_320_p.m4a').replace('_96.mp4', '_320.mp4').replace('_96.m4a', '_320.m4a')
+        if high_quality:
+            return dec_url.replace('_96_p.mp4', '_320_p.mp4').replace('_96_p.m4a', '_320_p.m4a').replace('_96.mp4', '_320.mp4').replace('_96.m4a', '_320.m4a')
+        return dec_url
     except Exception as e:
         print(f"JioSaavn decryption error: {e}")
         return ""
 
-async def search_jiosaavn(title: str, artist: str) -> str:
+async def search_jiosaavn(title: str, artist: str, high_quality: bool = True) -> str:
     try:
         query = urllib.parse.quote(f"{title} {artist}")
         search_url = f"https://www.jiosaavn.com/api.php?__call=autocomplete.get&_format=json&_marker=0&ctx=android&query={query}"
@@ -111,7 +113,7 @@ async def search_jiosaavn(title: str, artist: str) -> str:
                         song_info = song_data.get(song_id, {})
                         enc_url = song_info.get("encrypted_media_url")
                         if enc_url:
-                            return decrypt_jiosaavn_url(enc_url)
+                            return decrypt_jiosaavn_url(enc_url, high_quality)
     except Exception as e:
         print(f"JioSaavn search error: {e}")
     return ""
@@ -127,23 +129,59 @@ async def search(q: str):
 @app.get("/api/regional-top")
 async def regional_top(language: str):
     try:
-        from datetime import datetime
-        current_year = datetime.now().year
-
-        # Search for an official or curated trending playlist for the language
-        if language.lower() == "global":
-            query = f"Global Top 100 songs"
-        elif language.lower() == "90s":
-            query = "90s Bollywood hit songs"
-        else:
-            query = f"Top 100 {language} songs"
+        # Map languages to official JioSaavn Trending/Top 50 Playlist IDs
+        chart_ids = {
+            'hindi': '49', # Hindi Top 50
+            'tamil': '1134651042', # Tamil Top 50
+            'telugu': '2574962', # Telugu Top 50
+            'punjabi': '1134543511', # Punjabi Top 50
+            'malayalam': '3344648', # Malayalam Top 50
+            'kannada': '2676953', # Kannada Top 50
+            'bhojpuri': '1134768973', # Bhojpuri Top 50
+            'global': '1134595537', # English Top 50
+            '90s': '1167751266', # Hindi 1990s
+        }
         
-        results = ytmusic.search(query, filter="songs", limit=50)
-        valid_results = [item for item in results if item.get("videoId")]
-        import random
-        random.shuffle(valid_results)
-        return [format_track(item) for item in valid_results][:20]
+        lang_key = language.lower()
+        playlist_id = chart_ids.get(lang_key, chart_ids['hindi']) # fallback to Hindi Top 50
+
+        url = f"https://www.jiosaavn.com/api.php?__call=playlist.getDetails&listid={playlist_id}&_format=json&_marker=0&ctx=android"
+        async with httpx.AsyncClient() as client:
+            res = await client.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10.0)
+            if res.status_code == 200:
+                data = res.json()
+                # Parse JioSaavn playlist format (keys are '0', '1', '2'...)
+                songs = [data[str(i)] for i in range(50) if str(i) in data]
+                
+                formatted_results = []
+                for song in songs:
+                    try:
+                        s = int(song.get('duration', 0))
+                        dur = f"{s//60}:{s%60:02d}"
+                    except:
+                        dur = "0:00"
+                        
+                    art = song.get('image', '').replace('150x150', '500x500')
+                    artist = song.get('singers') or song.get('primary_artists') or "Unknown Artist"
+                    title = song.get('song', 'Unknown Title')
+                    
+                    formatted_results.append({
+                        "id": song.get('id', ''),
+                        "title": title,
+                        "artist": artist,
+                        "duration": dur,
+                        "art": art,
+                        "genre": language,
+                        "preview_url": ""
+                    })
+                
+                import random
+                random.shuffle(formatted_results)
+                return formatted_results[:20]
+        
+        return []
     except Exception as e:
+        print(f"Regional Top Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/stream")
@@ -312,8 +350,8 @@ async def get_recommendations(seed: str, genre: str = None, video_id: str = None
 async def analyze_track(track: TrackRequest):
     temp_file = f"temp_{track.id}.m4a"
     try:
-        # 1. Download audio
-        stream_url = await search_jiosaavn(track.title, track.artist)
+        # 1. Download audio (use low quality for 5x faster transcription)
+        stream_url = await search_jiosaavn(track.title, track.artist, high_quality=False)
         
         if stream_url:
             # Download using httpx
