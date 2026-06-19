@@ -1,0 +1,102 @@
+[
+  {
+    "AllowMultiple": false,
+    "Description": "Remove artist hint from the AI prompt",
+    "EndLine": 310,
+    "Instruction": "Remove the artist name from the user prompt given to the AI, keeping everything else the same",
+    "ReplacementContent": "                            {\"role\": \"user\", \"content\": f\"Title Hint: {track.title}\\nFull Transcript:\\n{transcription.text}\"}",
+    "StartLine": 310,
+    "TargetContent": "                            {\"role\": \"user\", \"content\": f\"Title Hint: {track.title}\\nArtist Hint: {track.artist}\\nFull Transcript:\\n{transcription.text}\"}",
+    "TargetFile": "d:/P R O J E C T/Music DNA/backend/main.py",
+    "toolAction": "Updating backend main.py",
+    "toolSummary": "Update main.py"
+  },
+  {
+    "Description": "Pass the actual audio language detected by Whisper directly to the AI brain",
+    "Instruction": "Enable verbose_json on Whisper to capture the detected audio language, and pass this detected language as a strong hint to the Llama 3 model.",
+    "ReplacementChunks": [
+      {
+        "AllowMultiple": false,
+        "EndLine": 303,
+        "ReplacementContent": "                            file=(m4a_filepath, file.read()),\n                            model=\"whisper-large-v3\",\n                            response_format=\"verbose_json\"\n                        )\n                    \n                    detected_language = getattr(transcription, \"language\", \"unknown\")",
+        "StartLine": 300,
+        "TargetContent": "                            file=(m4a_filepath, file.read()),\n                            model=\"whisper-large-v3\",\n                            prompt=\"Identify the language.\",\n                        )"
+      },
+      {
+        "AllowMultiple": false,
+        "EndLine": 310,
+        "ReplacementContent": "                            {\"role\": \"user\", \"content\": f\"Title Hint: {track.title}\\nAudio Language Detected by Ear: {detected_language}\\nFull Transcript:\\n{transcription.text}\"}",
+        "StartLine": 310,
+        "TargetContent": "                            {\"role\": \"user\", \"content\": f\"Title Hint: {track.title}\\nFull Transcript:\\n{transcription.text}\"}"
+      }
+    ],
+    "TargetFile": "d:/P R O J E C T/Music DNA/backend/main.py",
+    "toolAction": "Updating backend main.py",
+    "toolSummary": "Update main.py"
+  },
+  {
+    "AllowMultiple": false,
+    "Description": "Add Artist Hint back to the AI prompt",
+    "EndLine": 312,
+    "Instruction": "Add Artist Hint to the user prompt for Llama 3",
+    "ReplacementContent": "                            {\"role\": \"user\", \"content\": f\"Title Hint: {track.title}\\nArtist Hint: {track.artist}\\nAudio Language Detected by Ear: {detected_language}\\nFull Transcript:\\n{transcription.text}\"}",
+    "StartLine": 312,
+    "TargetContent": "                            {\"role\": \"user\", \"content\": f\"Title Hint: {track.title}\\nAudio Language Detected by Ear: {detected_language}\\nFull Transcript:\\n{transcription.text}\"}",
+    "TargetFile": "d:/P R O J E C T/Music DNA/backend/main.py",
+    "toolAction": "Updating backend main.py",
+    "toolSummary": "Update main.py"
+  },
+  {
+    "Description": "Add context_language support to TrackRequest and improve LLM prompting against multi-lingual artist bias",
+    "Instruction": "Add context_language to TrackRequest and update LLM prompt",
+    "ReplacementChunks": [
+      {
+        "AllowMultiple": false,
+        "EndLine": 14,
+        "ReplacementContent": "from pydantic import BaseModel\nfrom typing import Optional\nimport imageio_ffmpeg",
+        "StartLine": 13,
+        "TargetContent": "from pydantic import BaseModel\nimport imageio_ffmpeg"
+      },
+      {
+        "AllowMultiple": false,
+        "EndLine": 39,
+        "ReplacementContent": "class TrackRequest(BaseModel):\n    id: str\n    title: str\n    artist: str\n    genre: str\n    duration: str = \"0:00\"\n    art: str\n    preview_url: str\n    context_language: Optional[str] = None",
+        "StartLine": 32,
+        "TargetContent": "class TrackRequest(BaseModel):\n    id: str\n    title: str\n    artist: str\n    genre: str\n    duration: str = \"0:00\"\n    art: str\n    preview_url: str"
+      },
+      {
+        "AllowMultiple": false,
+        "EndLine": 315,
+        "ReplacementContent": "                    # Construct prompt with optional context\n                    user_prompt = f\"Title Hint: {track.title}\\nArtist Hint: {track.artist}\\n\"\n                    if track.context_language:\n                        user_prompt += f\"Chart Context: User found this in the '{track.context_language}' charts. Prioritize this as the language!\\n\"\n                    user_prompt += f\"Audio Language Detected by Ear: {detected_language}\\nFull Transcript:\\n{transcription.text}\"\n\n                    # Ask Groq Llama to detect the primary language, artist, and album\n                    completion = await client.chat.completions.create(\n                        model=\"llama-3.3-70b-versatile\",\n                        messages=[\n                            {\"role\": \"system\", \"content\": \"You are an expert music metadata extractor. You are provided with the full audio transcript of a song. Your task is to:\\n1. Identify the primary language of the song. Be aware that many artists sing in multiple languages; do NOT blindly guess based on the artist's native language. Focus on the Title Hint and Chart Context if provided.\\n2. Extract or infer the Artist Name.\\n3. Extract or infer the Album Name.\\n\\nReturn ONLY a valid JSON object with keys: 'primary_language', 'artist', 'album'. Do not include markdown formatting.\"},\n                            {\"role\": \"user\", \"content\": user_prompt}\n                        ],\n                        response_format={\"type\": \"json_object\"}\n                    )",
+        "StartLine": 307,
+        "TargetContent": "                    # Ask Groq Llama to detect the primary language, artist, and album\n                    completion = await client.chat.completions.create(\n                        model=\"llama-3.3-70b-versatile\",\n                        messages=[\n                            {\"role\": \"system\", \"content\": \"You are an expert music metadata extractor. You are provided with the full audio transcript of a song. Your task is to:\\n1. Identify the primary language of the song. If it's a mixture, return the language that is spoken the most.\\n2. Extract or infer the Artist Name.\\n3. Extract or infer the Album Name.\\n\\nReturn ONLY a valid JSON object with keys: 'primary_language', 'artist', 'album'. Do not include markdown formatting.\"},\n                            {\"role\": \"user\", \"content\": f\"Title Hint: {track.title}\\nArtist Hint: {track.artist}\\nAudio Language Detected by Ear: {detected_language}\\nFull Transcript:\\n{transcription.text}\"}\n                        ],\n                        response_format={\"type\": \"json_object\"}\n                    )"
+      }
+    ],
+    "TargetFile": "d:/P R O J E C T/Music DNA/backend/main.py",
+    "toolAction": "Updating backend main.py",
+    "toolSummary": "Update main.py"
+  },
+  {
+    "Description": "Revert Option 1 and 2 from backend/main.py",
+    "Instruction": "Revert TrackRequest and prompt logic back to the state before Options 1 and 2",
+    "ReplacementChunks": [
+      {
+        "AllowMultiple": false,
+        "EndLine": 40,
+        "ReplacementContent": "class TrackRequest(BaseModel):\n    id: str\n    title: str\n    artist: str\n    genre: str\n    duration: str = \"0:00\"\n    art: str\n    preview_url: str",
+        "StartLine": 32,
+        "TargetContent": "class TrackRequest(BaseModel):\n    id: str\n    title: str\n    artist: str\n    genre: str\n    duration: str = \"0:00\"\n    art: str\n    preview_url: str\n    context_language: Optional[str] = None"
+      },
+      {
+        "AllowMultiple": false,
+        "EndLine": 324,
+        "ReplacementContent": "                    # Ask Groq Llama to detect the primary language, artist, and album\n                    completion = await client.chat.completions.create(\n                        model=\"llama-3.3-70b-versatile\",\n                        messages=[\n                            {\"role\": \"system\", \"content\": \"You are an expert music metadata extractor. You are provided with the full audio transcript of a song. Your task is to:\\n1. Identify the primary language of the song. If it's a mixture, return the language that is spoken the most.\\n2. Extract or infer the Artist Name.\\n3. Extract or infer the Album Name.\\n\\nReturn ONLY a valid JSON object with keys: 'primary_language', 'artist', 'album'. Do not include markdown formatting.\"},\n                            {\"role\": \"user\", \"content\": f\"Title Hint: {track.title}\\nAudio Language Detected by Ear: {detected_language}\\nFull Transcript:\\n{transcription.text}\"}\n                        ],\n                        response_format={\"type\": \"json_object\"}\n                    )",
+        "StartLine": 305,
+        "TargetContent": "                    # Construct prompt with optional context\n                    user_prompt = f\"Title Hint: {track.title}\\nArtist Hint: {track.artist}\\n\"\n                    if track.context_language:\n                        user_prompt += f\"Chart Context: User found this in the '{track.context_language}' charts. Prioritize this as the language!\\n\"\n                    user_prompt += f\"Audio Language Detected by Ear: {detected_language}\\nFull Transcript:\\n{transcription.text}\"\n\n                    # Ask Groq Llama to detect the primary language, artist, and album\n                    completion = await client.chat.completions.create(\n                        model=\"llama-3.3-70b-versatile\",\n                        messages=[\n                            {\"role\": \"system\", \"content\": \"You are an expert music metadata extractor. You are provided with the full audio transcript of a song. Your task is to:\\n1. Identify the primary language of the song. Be aware that many artists sing in multiple languages; do NOT blindly guess based on the artist's native language. Focus on the Title Hint and Chart Context if provided.\\n2. Extract or infer the Artist Name.\\n3. Extract or infer the Album Name.\\n\\nReturn ONLY a valid JSON object with keys: 'primary_language', 'artist', 'album'. Do not include markdown formatting.\"},\n                            {\"role\": \"user\", \"content\": user_prompt}\n                        ],\n                        response_format={\"type\": \"json_object\"}\n                    )"
+      }
+    ],
+    "TargetFile": "d:/P R O J E C T/Music DNA/backend/main.py",
+    "toolAction": "Updating backend main.py",
+    "toolSummary": "Update main.py"
+  }
+]
