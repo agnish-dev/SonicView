@@ -87,10 +87,12 @@ def decrypt_jiosaavn_url(url: str, high_quality: bool = True) -> str:
         des_cipher = DES.new(b'38346591', DES.MODE_ECB)
         enc_url = base64.b64decode(url.strip())
         dec_url = des_cipher.decrypt(enc_url)
-        dec_url = dec_url.decode('utf-8').rstrip('\0')
+        import re
+        dec_url = dec_url.decode('utf-8')
+        dec_url = re.sub(r'[^\x20-\x7E]', '', dec_url).strip()
         if high_quality:
-            return dec_url.replace('_96_p.mp4', '_320_p.mp4').replace('_96_p.m4a', '_320_p.m4a').replace('_96.mp4', '_320.mp4').replace('_96.m4a', '_320.m4a')
-        return dec_url
+            return dec_url.replace('_96_p.mp4', '_320_p.mp4').replace('_96_p.m4a', '_320_p.m4a').replace('_96.mp4', '_320.mp4').replace('_96.m4a', '_320.m4a').strip()
+        return dec_url.strip()
     except Exception as e:
         print(f"JioSaavn decryption error: {e}")
         return ""
