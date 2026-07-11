@@ -83,18 +83,30 @@ def format_track(item):
     }
 
 async def get_piped_stream(video_id: str) -> str:
-    try:
-        url = f"https://pipedapi.kavin.rocks/streams/{video_id}"
-        async with httpx.AsyncClient() as client:
-            res = await client.get(url, timeout=10.0)
-            if res.status_code == 200:
-                data = res.json()
-                audio_streams = data.get("audioStreams", [])
-                if audio_streams:
-                    # Return the URL of the first audio stream
-                    return audio_streams[0].get("url", "")
-    except Exception as e:
-        print(f"Piped API error: {e}")
+    instances = [
+        "https://pipedapi.in.projectsegfau.lt",
+        "https://pipedapi.kavin.rocks",
+        "https://piped-api.lunar.icu",
+        "https://api.piped.privacydev.net"
+    ]
+    
+    async with httpx.AsyncClient() as client:
+        for instance in instances:
+            try:
+                url = f"{instance}/streams/{video_id}"
+                # Piped APIs sometimes require a User-Agent to bypass Cloudflare
+                headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+                res = await client.get(url, headers=headers, timeout=5.0)
+                if res.status_code == 200:
+                    data = res.json()
+                    audio_streams = data.get("audioStreams", [])
+                    if audio_streams:
+                        # Return the URL of the first audio stream
+                        return audio_streams[0].get("url", "")
+            except Exception as e:
+                print(f"Piped API error on {instance}: {e}")
+                continue
+                
     return ""
 
 @app.get("/api/search")
