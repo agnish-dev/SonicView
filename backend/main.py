@@ -82,6 +82,47 @@ def format_track(item):
         "preview_url": ""
     }
 
+import base64
+from Crypto.Cipher import DES
+
+def decrypt_jiosaavn_url(url: str, high_quality: bool = True) -> str:
+    try:
+        des_cipher = DES.new(b'38346591', DES.MODE_ECB)
+        enc_url = base64.b64decode(url.strip())
+        dec_url = des_cipher.decrypt(enc_url)
+        import re
+        dec_url = dec_url.decode('utf-8')
+        dec_url = re.sub(r'[^\x20-\x7E]', '', dec_url).strip()
+        if high_quality:
+            return dec_url.replace('_96_p.mp4', '_320_p.mp4').replace('_96_p.m4a', '_320_p.m4a').replace('_96.mp4', '_320.mp4').replace('_96.m4a', '_320.m4a').strip()
+        return dec_url.strip()
+    except Exception as e:
+        print(f"JioSaavn decryption error: {e}")
+        return ""
+
+async def search_jiosaavn(title: str, artist: str, high_quality: bool = True) -> str:
+    try:
+        query = urllib.parse.quote(f"{title} {artist}")
+        search_url = f"https://www.jiosaavn.com/api.php?__call=autocomplete.get&_format=json&_marker=0&ctx=android&query={query}"
+        async with httpx.AsyncClient() as client:
+            res = await client.get(search_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10.0)
+            if res.status_code == 200:
+                data = res.json()
+                songs = data.get('songs', {'data': []})['data']
+                if songs:
+                    song_id = songs[0]['id']
+                    details_url = f"https://www.jiosaavn.com/api.php?__call=song.getDetails&pids={song_id}&_format=json&_marker=0&ctx=android"
+                    details_res = await client.get(details_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10.0)
+                    if details_res.status_code == 200:
+                        song_data = details_res.json()
+                        song_info = song_data.get(song_id, {})
+                        enc_url = song_info.get("encrypted_media_url")
+                        if enc_url:
+                            return decrypt_jiosaavn_url(enc_url, high_quality)
+    except Exception as e:
+        print(f"JioSaavn search error: {e}")
+    return ""
+
 async def get_piped_stream(video_id: str) -> str:
     instances = [
         "https://pipedapi.in.projectsegfau.lt",
@@ -219,8 +260,15 @@ async def get_stream(video_id: str, title: Optional[str] = None, artist: Optiona
                     url = info['formats'][-1]['url']
                 stream_url = url
         except Exception as e:
-            print(f"yt-dlp failed, falling back to Piped API: {e}")
+            print(f"yt-dlp failed: {e}")
+            
+        if not stream_url:
+            print("Falling back to Piped API")
             stream_url = await get_piped_stream(video_id)
+            
+        if not stream_url and title and artist:
+            print("Falling back to JioSaavn API")
+            stream_url = await search_jiosaavn(title, artist)
             
         if not stream_url:
             raise Exception("Failed to extract stream URL from all sources.")
@@ -365,8 +413,12 @@ async def analyze_track(track: TrackRequest):
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([f"https://www.youtube.com/watch?v={track.id}"])
         except Exception as e:
-            print(f"yt-dlp download failed, falling back to Piped API: {e}")
+            print(f"yt-dlp download failed: {e}")
+            
             stream_url = await get_piped_stream(track.id)
+            if not stream_url:
+                stream_url = await search_jiosaavn(track.title, track.artist, high_quality=False)
+                
             if stream_url:
                 async with httpx.AsyncClient() as client:
                     response = await client.get(stream_url, timeout=30.0)
