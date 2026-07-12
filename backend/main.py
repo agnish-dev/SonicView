@@ -120,26 +120,57 @@ async def search(q: str):
 @app.get("/api/regional-top")
 async def regional_top(language: str):
     try:
-        queries = {
-            'hindi': 'Top Hindi Songs',
-            'tamil': 'Top Tamil Songs',
-            'telugu': 'Top Telugu Songs',
-            'punjabi': 'Top Punjabi Songs',
-            'malayalam': 'Top Malayalam Songs',
-            'kannada': 'Top Kannada Songs',
-            'bhojpuri': 'Top Bhojpuri Songs',
-            'global': 'Top 50 Global',
-            '90s': 'Best 90s Bollywood Songs',
+        # Map languages to official JioSaavn Trending/Top 50 Playlist IDs
+        chart_ids = {
+            'hindi': '49', # Hindi Top 50
+            'tamil': '1134651042', # Tamil Top 50
+            'telugu': '2574962', # Telugu Top 50
+            'punjabi': '1134543511', # Punjabi Top 50
+            'malayalam': '3344648', # Malayalam Top 50
+            'kannada': '2676953', # Kannada Top 50
+            'bhojpuri': '1134768973', # Bhojpuri Top 50
+            'global': '1134595537', # English Top 50
+            '90s': '1167751266', # Hindi 1990s
         }
         
         lang_key = language.lower()
-        query = queries.get(lang_key, queries['hindi'])
+        playlist_id = chart_ids.get(lang_key, chart_ids['hindi']) # fallback to Hindi Top 50
+
+        url = f"https://www.jiosaavn.com/api.php?__call=playlist.getDetails&listid={playlist_id}&_format=json&_marker=0&ctx=android"
+        async with httpx.AsyncClient() as client:
+            res = await client.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10.0)
+            if res.status_code == 200:
+                data = res.json()
+                # Parse JioSaavn playlist format (keys are '0', '1', '2'...)
+                songs = [data[str(i)] for i in range(50) if str(i) in data]
+                
+                formatted_results = []
+                for song in songs:
+                    try:
+                        s = int(song.get('duration', 0))
+                        dur = f"{s//60}:{s%60:02d}"
+                    except:
+                        dur = "0:00"
+                        
+                    art = song.get('image', '').replace('150x150', '500x500')
+                    artist = song.get('singers') or song.get('primary_artists') or "Unknown Artist"
+                    title = song.get('song', 'Unknown Title')
+                    
+                    formatted_results.append({
+                        "id": song.get('id', ''),
+                        "title": title,
+                        "artist": artist,
+                        "duration": dur,
+                        "art": art,
+                        "genre": language,
+                        "preview_url": ""
+                    })
+                
+                import random
+                random.shuffle(formatted_results)
+                return formatted_results[:20]
         
-        results = ytmusic.search(query, filter="songs", limit=25)
-        formatted_results = [format_track(item) for item in results if item.get("videoId")]
-        import random
-        random.shuffle(formatted_results)
-        return formatted_results[:20]
+        return []
     except Exception as e:
         print(f"Regional Top Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
