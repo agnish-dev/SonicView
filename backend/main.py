@@ -101,7 +101,9 @@ async def get_piped_stream(video_id: str) -> str:
                     data = res.json()
                     audio_streams = data.get("audioStreams", [])
                     if audio_streams:
-                        # Return the URL of the first audio stream
+                        m4a_stream = next((s for s in audio_streams if s.get("mimeType", "").startswith("audio/mp4")), None)
+                        if m4a_stream:
+                            return m4a_stream.get("url", "")
                         return audio_streams[0].get("url", "")
             except Exception as e:
                 print(f"Piped API error on {instance}: {e}")
@@ -179,7 +181,7 @@ async def regional_top(language: str):
 async def get_stream(video_id: str, title: Optional[str] = None, artist: Optional[str] = None):
     try:
         ydl_opts = {
-            'format': 'bestaudio/best',
+            'format': 'bestaudio[ext=m4a]/bestaudio/best',
             'quiet': True,
             'no_warnings': True,
             'extractor_args': {'youtube': {'client': ['tv_embedded', 'web_creator', 'android', 'ios']}},
