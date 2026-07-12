@@ -112,6 +112,8 @@ async def search_jiosaavn(title: str, artist: str, high_quality: bool = True) ->
                 data = res.json()
                 songs = data.get('songs', {'data': []})['data']
                 if songs:
+                    # Sort by click-through rate (CTR) to prioritize the most popular/official version
+                    songs.sort(key=lambda x: int(x.get("ctr", 0)), reverse=True)
                     song_id = songs[0]['id']
                     details_url = f"https://www.jiosaavn.com/api.php?__call=song.getDetails&pids={song_id}&_format=json&_marker=0&ctx=android"
                     details_res = await client.get(details_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10.0)
