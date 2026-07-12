@@ -102,7 +102,9 @@ def decrypt_jiosaavn_url(url: str, high_quality: bool = True) -> str:
 
 async def search_jiosaavn(title: str, artist: str, high_quality: bool = True) -> str:
     try:
-        query = urllib.parse.quote(f"{title} {artist}")
+        import re
+        clean_title = re.sub(r'\(.*?\)|\[.*?\]', '', title).strip()
+        query = urllib.parse.quote(f"{clean_title} {artist}")
         search_url = f"https://www.jiosaavn.com/api.php?__call=autocomplete.get&_format=json&_marker=0&ctx=android&query={query}"
         async with httpx.AsyncClient() as client:
             res = await client.get(search_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10.0)
