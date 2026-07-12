@@ -368,7 +368,7 @@ function App() {
       setIsLoadingStream(true);
       setStreamUrl(null);
       try {
-        const res = await fetch(`${API_BASE}/api/stream?video_id=${currentPlayingTrack.id}&title=${encodeURIComponent(currentPlayingTrack.title)}&artist=${encodeURIComponent(currentPlayingTrack.artist)}`);
+        const res = await fetch(`${API_BASE}/api/stream?video_id=${currentPlayingTrack.id}&title=${encodeURIComponent(currentPlayingTrack.title)}&artist=${encodeURIComponent(currentPlayingTrack.artist)}&_t=${Date.now()}`);
         if (!res.ok) throw new Error("Stream fetch failed");
         const data = await res.json();
         if (active) {
