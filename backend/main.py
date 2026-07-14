@@ -24,6 +24,16 @@ import json
 
 load_dotenv()
 
+# Securely load YouTube cookies from base64 environment variable (for Render deployment)
+youtube_cookies_b64 = os.getenv("YOUTUBE_COOKIES_BASE64")
+if youtube_cookies_b64:
+    try:
+        with open("cookies.txt", "w", encoding="utf-8") as f:
+            f.write(base64.b64decode(youtube_cookies_b64).decode("utf-8"))
+        print("Successfully loaded YouTube cookies from environment variables.")
+    except Exception as e:
+        print(f"Failed to load YouTube cookies: {e}")
+
 # Ensure yt-dlp can find ffmpeg for download_ranges
 ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
 ffmpeg_dir = os.path.dirname(ffmpeg_path)
