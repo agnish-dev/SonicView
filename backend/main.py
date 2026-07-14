@@ -110,32 +110,7 @@ def decrypt_jiosaavn_url(url: str, high_quality: bool = True) -> str:
         print(f"JioSaavn decryption error: {e}")
         return ""
 
-async def search_jiosaavn(title: str, artist: str, high_quality: bool = True) -> str:
-    try:
-        import re
-        clean_title = re.sub(r'\(.*?\)|\[.*?\]', '', title).strip()
-        query = urllib.parse.quote(f"{clean_title} {artist}")
-        search_url = f"https://www.jiosaavn.com/api.php?__call=autocomplete.get&_format=json&_marker=0&ctx=android&query={query}"
-        async with httpx.AsyncClient() as client:
-            res = await client.get(search_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10.0)
-            if res.status_code == 200:
-                data = res.json()
-                songs = data.get('songs', {'data': []})['data']
-                if songs:
-                    # Sort by click-through rate (CTR) to prioritize the most popular/official version
-                    songs.sort(key=lambda x: int(x.get("ctr", 0)), reverse=True)
-                    song_id = songs[0]['id']
-                    details_url = f"https://www.jiosaavn.com/api.php?__call=song.getDetails&pids={song_id}&_format=json&_marker=0&ctx=android"
-                    details_res = await client.get(details_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10.0)
-                    if details_res.status_code == 200:
-                        song_data = details_res.json()
-                        song_info = song_data.get(song_id, {})
-                        enc_url = song_info.get("encrypted_media_url")
-                        if enc_url:
-                            return decrypt_jiosaavn_url(enc_url, high_quality)
-    except Exception as e:
-        print(f"JioSaavn search error: {e}")
-    return ""
+
 
 async def get_piped_stream(video_id: str) -> str:
     instances = [
@@ -214,7 +189,7 @@ async def regional_top(language: str):
                     title = song.get('song', 'Unknown Title')
                     
                     formatted_results.append({
-                        "id": song.get('id', ''),
+                        "id": "jiosaavn:" + song.get('id', ''),
                         "title": title,
                         "artist": artist,
                         "duration": dur,
@@ -235,6 +210,19 @@ async def regional_top(language: str):
 @app.get("/api/stream")
 async def get_stream(video_id: str, title: Optional[str] = None, artist: Optional[str] = None):
     try:
+        if video_id.startswith("jiosaavn:"):
+            real_id = video_id.split(":", 1)[1]
+            url = f"https://www.jiosaavn.com/api.php?__call=song.getDetails&pids={real_id}&_format=json&_marker=0&ctx=android"
+            async with httpx.AsyncClient() as client:
+                res = await client.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10.0)
+                if res.status_code == 200:
+                    data = res.json()
+                    song_info = data.get(real_id, {})
+                    enc_url = song_info.get("encrypted_media_url")
+                    if enc_url:
+                        return {"stream_url": decrypt_jiosaavn_url(enc_url, high_quality=True), "skip_segments": []}
+            raise Exception("Failed to extract JioSaavn stream URL.")
+
         ydl_opts = {
             'format': 'bestaudio[ext=m4a]/bestaudio/best',
             'quiet': True,
@@ -282,10 +270,7 @@ async def get_stream(video_id: str, title: Optional[str] = None, artist: Optiona
             print("Falling back to Piped API")
             stream_url = await get_piped_stream(video_id)
             
-        if not stream_url and title and artist:
-            print("Falling back to JioSaavn API")
-            stream_url = await search_jiosaavn(title, artist)
-            
+
         if not stream_url:
             raise Exception("Failed to extract stream URL from all sources.")
             
@@ -408,39 +393,54 @@ async def get_recommendations(seed: str, genre: str = None, video_id: str = None
 async def analyze_track(track: TrackRequest):
     temp_file = f"temp_{track.id}.m4a"
     try:
-        # 1. Download audio
-        import imageio_ffmpeg
-        ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
+        if track.id.startswith("jiosaavn:"):
+            real_id = track.id.split(":", 1)[1]
+            url = f"https://www.jiosaavn.com/api.php?__call=song.getDetails&pids={real_id}&_format=json&_marker=0&ctx=android"
+            async with httpx.AsyncClient() as client:
+                res = await client.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10.0)
+                if res.status_code == 200:
+                    data = res.json()
+                    song_info = data.get(real_id, {})
+                    enc_url = song_info.get("encrypted_media_url")
+                    if enc_url:
+                        stream_url = decrypt_jiosaavn_url(enc_url, high_quality=False)
+                        response = await client.get(stream_url, timeout=30.0)
+                        if response.status_code == 200:
+                            with open(temp_file, "wb") as f:
+                                f.write(response.content)
+            if not os.path.exists(temp_file):
+                raise Exception("Failed to download JioSaavn track for analysis.")
+        else:
+            # 1. Download audio via yt-dlp
+            import imageio_ffmpeg
+            ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
 
-        ydl_opts = {
-            'format': 'bestaudio[ext=m4a]/bestaudio/best',
-            'outtmpl': temp_file,
-            'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'm4a'}],
-            'quiet': True,
-            'no_warnings': True,
-            'ffmpeg_location': ffmpeg_path,
-            'extractor_args': {'youtube': {'client': ['tv_embedded', 'web_creator', 'android', 'ios']}},
-            'js_runtimes': {'node': {}}
-        }
-        if os.path.exists('cookies.txt'):
-            ydl_opts['cookiefile'] = 'cookies.txt'
-        
-        try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.download([f"https://www.youtube.com/watch?v={track.id}"])
-        except Exception as e:
-            print(f"yt-dlp download failed: {e}")
+            ydl_opts = {
+                'format': 'bestaudio[ext=m4a]/bestaudio/best',
+                'outtmpl': temp_file,
+                'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'm4a'}],
+                'quiet': True,
+                'no_warnings': True,
+                'ffmpeg_location': ffmpeg_path,
+                'extractor_args': {'youtube': {'client': ['tv_embedded', 'web_creator', 'android', 'ios']}},
+                'js_runtimes': {'node': {}}
+            }
+            if os.path.exists('cookies.txt'):
+                ydl_opts['cookiefile'] = 'cookies.txt'
             
-            stream_url = await get_piped_stream(track.id)
-            if not stream_url:
-                stream_url = await search_jiosaavn(track.title, track.artist, high_quality=False)
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    ydl.download([f"https://www.youtube.com/watch?v={track.id}"])
+            except Exception as e:
+                print(f"yt-dlp download failed: {e}")
                 
-            if stream_url:
-                async with httpx.AsyncClient() as client:
-                    response = await client.get(stream_url, timeout=30.0)
-                    if response.status_code == 200:
-                        with open(temp_file, "wb") as f:
-                            f.write(response.content)
+                stream_url = await get_piped_stream(track.id)
+                if stream_url:
+                    async with httpx.AsyncClient() as client:
+                        response = await client.get(stream_url, timeout=30.0)
+                        if response.status_code == 200:
+                            with open(temp_file, "wb") as f:
+                                f.write(response.content)
             
         # Check if the file exists (yt-dlp might append .m4a based on postprocessor)
         actual_file = temp_file
