@@ -224,11 +224,10 @@ async def get_stream(video_id: str, title: Optional[str] = None, artist: Optiona
             raise Exception("Failed to extract JioSaavn stream URL.")
 
         ydl_opts = {
-            'format': 'bestaudio[ext=m4a]/bestaudio/best',
+            'format': 'bestaudio/best',
             'quiet': True,
             'no_warnings': True,
-            'extractor_args': {'youtube': {'client': ['tv_embedded', 'web_creator', 'android', 'ios']}},
-            'js_runtimes': {'node': {}}
+            'extractor_args': {'youtube': {'player_client': ['android_vr', 'mweb']}},
         }
         if os.path.exists('cookies.txt'):
             ydl_opts['cookiefile'] = 'cookies.txt'
@@ -422,8 +421,7 @@ async def analyze_track(track: TrackRequest):
                 'quiet': True,
                 'no_warnings': True,
                 'ffmpeg_location': ffmpeg_path,
-                'extractor_args': {'youtube': {'client': ['tv_embedded', 'web_creator', 'android', 'ios']}},
-                'js_runtimes': {'node': {}}
+                'extractor_args': {'youtube': {'player_client': ['android_vr', 'mweb']}},
             }
             if os.path.exists('cookies.txt'):
                 ydl_opts['cookiefile'] = 'cookies.txt'
