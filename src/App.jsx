@@ -579,7 +579,7 @@ function App() {
             console.error("Search suggestion error:", err);
           }
         }
-      }, 0);
+      }, 500);
     } else {
       if (abortControllerRef.current) abortControllerRef.current.abort();
       setSuggestions([]);
