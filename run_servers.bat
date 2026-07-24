@@ -1,6 +1,6 @@
 @echo off
 echo Starting Music DNA Backend...
-start cmd /k "cd backend && .\venv\Scripts\python.exe -m uvicorn main:app --reload"
+start cmd /k "cd backend && .\venv\Scripts\python.exe -m uvicorn main:app --host 0.0.0.0 --reload"
 
 echo Starting Music DNA Frontend...
 start cmd /k "npm run dev"
