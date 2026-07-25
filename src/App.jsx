@@ -3,6 +3,16 @@ import { Music, ArrowLeft, Play, Activity, RefreshCw, Pause, SkipBack, SkipForwa
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
 
+const customFetch = (url, options = {}) => {
+  return fetch(url, {
+    ...options,
+    headers: {
+      ...options.headers,
+      "ngrok-skip-browser-warning": "69420"
+    }
+  });
+};
+
 function TrackPlayButton({ track, onPlay }) {
   return (
     <button 
@@ -316,7 +326,7 @@ function App() {
   const fetchRegionalSongs = async (language) => {
     setIsRegionalLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/regional-top?language=${encodeURIComponent(language)}`);
+      const res = await customFetch(`${API_BASE}/api/regional-top?language=${encodeURIComponent(language)}`);
       if (res.ok) {
         const data = await res.json();
         setRegionalSongs(data);
@@ -368,7 +378,7 @@ function App() {
       setIsLoadingStream(true);
       setStreamUrl(null);
       try {
-        const res = await fetch(`${API_BASE}/api/stream?video_id=${currentPlayingTrack.id}&title=${encodeURIComponent(currentPlayingTrack.title)}&artist=${encodeURIComponent(currentPlayingTrack.artist)}&_t=${Date.now()}`);
+        const res = await customFetch(`${API_BASE}/api/stream?video_id=${currentPlayingTrack.id}&title=${encodeURIComponent(currentPlayingTrack.title)}&artist=${encodeURIComponent(currentPlayingTrack.artist)}&_t=${Date.now()}`);
         if (!res.ok) throw new Error("Stream fetch failed");
         const data = await res.json();
         if (active) {
@@ -433,7 +443,7 @@ function App() {
       setCurrentLyrics(null);
       setIsLoadingLyrics(true);
       try {
-         const res = await fetch(`${API_BASE}/api/lyrics?video_id=${encodeURIComponent(currentPlayingTrack.id)}&title=${encodeURIComponent(currentPlayingTrack.title)}&artist=${encodeURIComponent(currentPlayingTrack.artist)}${currentPlayingTrack.duration ? `&duration=${encodeURIComponent(currentPlayingTrack.duration)}` : ''}`);
+         const res = await customFetch(`${API_BASE}/api/lyrics?video_id=${encodeURIComponent(currentPlayingTrack.id)}&title=${encodeURIComponent(currentPlayingTrack.title)}&artist=${encodeURIComponent(currentPlayingTrack.artist)}${currentPlayingTrack.duration ? `&duration=${encodeURIComponent(currentPlayingTrack.duration)}` : ''}`);
          if (active) {
              if (res.ok) {
                  const data = await res.json();
@@ -456,7 +466,7 @@ function App() {
     if (!analysisResult) return;
     setIsRefreshingGlobal(true);
     try {
-      const recRes = await fetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(analysisResult.recommendation_seed)}`);
+      const recRes = await customFetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(analysisResult.recommendation_seed)}`);
       if (recRes.ok) {
         const recData = await recRes.json();
         setRecommendations(recData);
@@ -469,7 +479,7 @@ function App() {
     if (!analysisResult) return [];
     setIsFetchingMoreGlobal(true);
     try {
-      const recRes = await fetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(analysisResult.recommendation_seed)}`);
+      const recRes = await customFetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(analysisResult.recommendation_seed)}`);
       if (recRes.ok) {
         const recData = await recRes.json();
         const newTracks = recData.filter(newTrack => !recommendations.some(t => t.id === newTrack.id));
@@ -496,7 +506,7 @@ function App() {
     if (!analysisResult || !selectedTrack) return;
     setIsRefreshingGenre(true);
     try {
-      const langRes = await fetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(analysisResult.recommendation_seed)}&genre=${encodeURIComponent(selectedTrack.genre)}&video_id=${encodeURIComponent(selectedTrack.id)}`);
+      const langRes = await customFetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(analysisResult.recommendation_seed)}&genre=${encodeURIComponent(selectedTrack.genre)}&video_id=${encodeURIComponent(selectedTrack.id)}`);
       if (langRes.ok) {
         const langData = await langRes.json();
         setLanguageRecommendations(langData);
@@ -509,7 +519,7 @@ function App() {
     if (!analysisResult) return [];
     setIsFetchingMoreGenre(true);
     try {
-      const langRes = await fetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(analysisResult.recommendation_seed)}&genre=${encodeURIComponent(analysisResult.language)}&video_id=${encodeURIComponent(selectedTrack.id)}`);
+      const langRes = await customFetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(analysisResult.recommendation_seed)}&genre=${encodeURIComponent(analysisResult.language)}&video_id=${encodeURIComponent(selectedTrack.id)}`);
       if (langRes.ok) {
         const langData = await langRes.json();
         const newTracks = langData.filter(newTrack => !languageRecommendations.some(t => t.id === newTrack.id));
@@ -541,7 +551,7 @@ function App() {
     setError('');
     
     try {
-      const res = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(query)}`);
+      const res = await customFetch(`${API_BASE}/api/search?q=${encodeURIComponent(query)}`);
       if (!res.ok) throw new Error("Search failed");
       const data = await res.json();
       setSearchResults(data);
@@ -566,7 +576,7 @@ function App() {
         abortControllerRef.current = new AbortController();
         
         try {
-          const res = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(val)}`, {
+          const res = await customFetch(`${API_BASE}/api/search?q=${encodeURIComponent(val)}`, {
             signal: abortControllerRef.current.signal
           });
           if (res.ok) {
@@ -597,7 +607,7 @@ function App() {
     setLanguageRecommendations([]);
     
     try {
-      const analyzeRes = await fetch(`${API_BASE}/api/analyze`, {
+      const analyzeRes = await customFetch(`${API_BASE}/api/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(track)
@@ -607,14 +617,14 @@ function App() {
       const analysisData = await analyzeRes.json();
       setAnalysisResult(analysisData);
       
-      const recRes = await fetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(analysisData.recommendation_seed)}&exclude_genre=${encodeURIComponent(analysisData.language || '')}`);
+      const recRes = await customFetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(analysisData.recommendation_seed)}&exclude_genre=${encodeURIComponent(analysisData.language || '')}`);
       if (recRes.ok) {
         const recData = await recRes.json();
         setRecommendations(recData);
       }
       
       // 3. Fetch Genre/Language specific recommendations using the AI detected language
-      const langRes = await fetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(analysisData.recommendation_seed)}&genre=${encodeURIComponent(analysisData.language || 'Bollywood')}&video_id=${encodeURIComponent(track.id)}`);
+      const langRes = await customFetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(analysisData.recommendation_seed)}&genre=${encodeURIComponent(analysisData.language || 'Bollywood')}&video_id=${encodeURIComponent(track.id)}`);
       if (langRes.ok) {
         const langData = await langRes.json();
         setLanguageRecommendations(langData);
@@ -712,7 +722,7 @@ function App() {
             e.preventDefault();
             if (!query.trim()) return;
             try {
-              const res = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(query)}`);
+              const res = await customFetch(`${API_BASE}/api/search?q=${encodeURIComponent(query)}`);
               if (res.ok) {
                 const data = await res.json();
                 setSuggestions(data.slice(0, 20));
