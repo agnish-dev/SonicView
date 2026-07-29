@@ -9,7 +9,8 @@ import sys
 # Add current directory to PATH so ffmpeg static binary can be found on Render
 os.environ["PATH"] += os.pathsep + os.getcwd()
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from ytmusicapi import YTMusic
@@ -209,6 +210,36 @@ async def regional_top(language: str):
         print(f"Regional Top Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/proxy_stream")
+async def proxy_stream(request: Request, url: str):
+    headers = {"User-Agent": "Mozilla/5.0"}
+    range_header = request.headers.get("range")
+    if range_header:
+        headers["Range"] = range_header
+
+    client = httpx.AsyncClient()
+    req = client.build_request("GET", url, headers=headers)
+    r = await client.send(req, stream=True, follow_redirects=True)
+
+    resp_headers = {}
+    for k, v in r.headers.items():
+        if k.lower() in ["content-type", "content-length", "content-range", "accept-ranges"]:
+            resp_headers[k] = v
+
+    async def stream_generator():
+        try:
+            async for chunk in r.aiter_bytes(chunk_size=65536):
+                yield chunk
+        finally:
+            await r.aclose()
+            await client.aclose()
+
+    return StreamingResponse(
+        stream_generator(),
+        status_code=r.status_code,
+        headers=resp_headers
+    )
+
 @app.get("/api/stream")
 async def get_stream(video_id: str, title: Optional[str] = None, artist: Optional[str] = None, quality: str = "high"):
     try:
@@ -281,7 +312,8 @@ async def get_stream(video_id: str, title: Optional[str] = None, artist: Optiona
         if not stream_url:
             raise Exception("Failed to extract stream URL from all sources.")
             
-        return {"stream_url": stream_url, "skip_segments": skip_segments}
+        proxy_url = f"/api/proxy_stream?url={urllib.parse.quote(stream_url)}"
+        return {"stream_url": proxy_url, "skip_segments": skip_segments}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

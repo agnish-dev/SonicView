@@ -387,7 +387,8 @@ function App() {
         if (!res.ok) throw new Error("Stream fetch failed");
         const data = await res.json();
         if (active) {
-          setStreamUrl(data.stream_url);
+          const finalUrl = data.stream_url.startsWith('/api/') ? API_BASE + data.stream_url : data.stream_url;
+          setStreamUrl(finalUrl);
           setSkipSegments(data.skip_segments || []);
         }
       } catch (err) {
