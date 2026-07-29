@@ -353,6 +353,7 @@ function App() {
 
   // Audio State
   const audioRef = useRef(null);
+  const blobUrlRef = useRef(null);
   const [streamUrl, setStreamUrl] = useState(null);
   const [isLoadingStream, setIsLoadingStream] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -388,7 +389,18 @@ function App() {
         const data = await res.json();
         if (active) {
           const finalUrl = data.stream_url.startsWith('/api/') ? API_BASE + data.stream_url : data.stream_url;
-          setStreamUrl(finalUrl);
+          
+          if (finalUrl.includes('ngrok-free.dev')) {
+            const audioRes = await customFetch(finalUrl);
+            const blob = await audioRes.blob();
+            const objectUrl = URL.createObjectURL(blob);
+            if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+            blobUrlRef.current = objectUrl;
+            setStreamUrl(objectUrl);
+          } else {
+            setStreamUrl(finalUrl);
+          }
+          
           setSkipSegments(data.skip_segments || []);
         }
       } catch (err) {
