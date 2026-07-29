@@ -1348,3 +1348,30 @@ header p {
   75% { width: 0.75em; }
   100% { width: 1em; }
 }
+
+/* Quality Selector */
+.quality-selector {
+  background: hsla(270, 30%, 20%, 0.6);
+  border: 1px solid hsla(270, 40%, 40%, 0.5);
+  color: var(--text-main);
+  padding: 0.4rem 1rem;
+  border-radius: 99px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  outline: none;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: var(--transition-smooth);
+}
+
+.quality-selector:hover {
+  background: hsla(270, 30%, 30%, 0.8);
+  border-color: var(--accent-color);
+}
+
+.quality-selector option {
+  background: var(--surface-color);
+  color: var(--text-main);
+}

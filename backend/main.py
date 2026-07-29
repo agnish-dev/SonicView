@@ -95,7 +95,7 @@ def format_track(item):
 import base64
 from Crypto.Cipher import DES
 
-def decrypt_jiosaavn_url(url: str, high_quality: bool = True) -> str:
+def decrypt_jiosaavn_url(url: str, quality: str = "high") -> str:
     try:
         des_cipher = DES.new(b'38346591', DES.MODE_ECB)
         enc_url = base64.b64decode(url.strip())
@@ -103,8 +103,10 @@ def decrypt_jiosaavn_url(url: str, high_quality: bool = True) -> str:
         import re
         dec_url = dec_url.decode('utf-8')
         dec_url = re.sub(r'[^\x20-\x7E]', '', dec_url).strip()
-        if high_quality:
+        if quality == "high":
             return dec_url.replace('_96_p.mp4', '_320_p.mp4').replace('_96_p.m4a', '_320_p.m4a').replace('_96.mp4', '_320.mp4').replace('_96.m4a', '_320.m4a').strip()
+        elif quality == "good":
+            return dec_url.replace('_96_p.mp4', '_160_p.mp4').replace('_96_p.m4a', '_160_p.m4a').replace('_96.mp4', '_160.mp4').replace('_96.m4a', '_160.m4a').strip()
         return dec_url.strip()
     except Exception as e:
         print(f"JioSaavn decryption error: {e}")
@@ -208,7 +210,7 @@ async def regional_top(language: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/stream")
-async def get_stream(video_id: str, title: Optional[str] = None, artist: Optional[str] = None):
+async def get_stream(video_id: str, title: Optional[str] = None, artist: Optional[str] = None, quality: str = "high"):
     try:
         if video_id.startswith("jiosaavn:"):
             real_id = video_id.split(":", 1)[1]
@@ -220,11 +222,17 @@ async def get_stream(video_id: str, title: Optional[str] = None, artist: Optiona
                     song_info = data.get(real_id, {})
                     enc_url = song_info.get("encrypted_media_url")
                     if enc_url:
-                        return {"stream_url": decrypt_jiosaavn_url(enc_url, high_quality=True), "skip_segments": []}
+                        return {"stream_url": decrypt_jiosaavn_url(enc_url, quality=quality), "skip_segments": []}
             raise Exception("Failed to extract JioSaavn stream URL.")
 
+        yt_format = 'bestaudio/best'
+        if quality == "standard":
+            yt_format = 'bestaudio[abr<=64]/bestaudio/best'
+        elif quality == "good":
+            yt_format = 'bestaudio[abr<=128]/bestaudio/best'
+
         ydl_opts = {
-            'format': 'bestaudio/best',
+            'format': yt_format,
             'quiet': True,
             'no_warnings': True,
             'extractor_args': {'youtube': {'player_client': ['android_vr', 'mweb']}},
@@ -402,7 +410,7 @@ async def analyze_track(track: TrackRequest):
                     song_info = data.get(real_id, {})
                     enc_url = song_info.get("encrypted_media_url")
                     if enc_url:
-                        stream_url = decrypt_jiosaavn_url(enc_url, high_quality=False)
+                        stream_url = decrypt_jiosaavn_url(enc_url, quality="standard")
                         response = await client.get(stream_url, timeout=30.0)
                         if response.status_code == 200:
                             with open(temp_file, "wb") as f:

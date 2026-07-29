@@ -359,6 +359,11 @@ function App() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [skipSegments, setSkipSegments] = useState([]);
+  const [audioQuality, setAudioQuality] = useState(localStorage.getItem('sonicview_quality') || 'high');
+
+  useEffect(() => {
+    localStorage.setItem('sonicview_quality', audioQuality);
+  }, [audioQuality]);
 
   useEffect(() => {
     if (!currentPlayingTrack) {
@@ -378,7 +383,7 @@ function App() {
       setIsLoadingStream(true);
       setStreamUrl(null);
       try {
-        const res = await customFetch(`${API_BASE}/api/stream?video_id=${currentPlayingTrack.id}&title=${encodeURIComponent(currentPlayingTrack.title)}&artist=${encodeURIComponent(currentPlayingTrack.artist)}&_t=${Date.now()}`);
+        const res = await customFetch(`${API_BASE}/api/stream?video_id=${currentPlayingTrack.id}&title=${encodeURIComponent(currentPlayingTrack.title)}&artist=${encodeURIComponent(currentPlayingTrack.artist)}&quality=${audioQuality}&_t=${Date.now()}`);
         if (!res.ok) throw new Error("Stream fetch failed");
         const data = await res.json();
         if (active) {
@@ -393,7 +398,7 @@ function App() {
     };
     fetchFullAudio();
     return () => { active = false; };
-  }, [currentPlayingTrack]);
+  }, [currentPlayingTrack, audioQuality]);
 
   const togglePlay = () => {
     if (!audioRef.current) return;
@@ -710,9 +715,21 @@ function App() {
 
   return (
     <div className="app-wrapper">
-      {/* App Logo */}
-      <div className="app-logo" onClick={resetSearch} style={{ cursor: 'pointer' }} title="Return to Home">
-        <span className="app-logo-text">SonicView</span>
+      {/* App Logo & Quality Selector */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', zIndex: 100, position: 'relative' }}>
+        <div className="app-logo" onClick={resetSearch} style={{ cursor: 'pointer' }} title="Return to Home">
+          <span className="app-logo-text">SonicView</span>
+        </div>
+        <select 
+          className="quality-selector"
+          value={audioQuality} 
+          onChange={(e) => setAudioQuality(e.target.value)}
+          title="Audio Quality"
+        >
+          <option value="standard">Standard</option>
+          <option value="good">Good</option>
+          <option value="high">High Definition</option>
+        </select>
       </div>
 
       {/* Global Top-Right Search Bar */}
