@@ -403,28 +403,16 @@ async def get_lyrics(video_id: str, title: str, artist: str, duration: Optional[
         print(f"Lyrics fetch error: {e}")
         return {"hasTimestamps": False, "lyrics": "Lyrics not available for this track."}
 
-@app.get("/api/recommend")
-async def get_recommendations(seed: str, genre: str = None, video_id: str = None):
-    try:
-        # Local / Genre Recommendations
-        if genre:
-            results = ytmusic.search(f"{genre} hit songs", filter="songs", limit=15)
-            return [format_track(item) for item in results if item.get("videoId")]
+AESTHETIC_TAGS = [
+    "Pop", "Rock", "Alternative Rock", "Indie Rock", "Hard Rock", "Punk Rock", "Pop Punk", "Metal", "Heavy Metal", "Death Metal", "Black Metal", "Doom Metal", "Thrash Metal", "Progressive Metal", "Folk", "Folk Rock", "Country", "Bluegrass", "Blues", "Jazz", "Smooth Jazz", "Bebop", "Swing", "Classical", "Opera", "Symphony", "Orchestra", "Chamber Music", "Electronic", "EDM", "House", "Deep House", "Tech House", "Progressive House", "Future House", "Electro House", "Trance", "Psytrance", "Techno", "Minimal Techno", "Drum & Bass", "Dubstep", "Future Bass", "Trap", "Hip-Hop", "Rap", "Boom Bap", "Drill", "Lo-fi Hip-Hop", "R&B", "Soul", "Funk", "Disco", "Reggae", "Dancehall", "Ska", "Gospel", "Latin", "Salsa", "Bachata", "Merengue", "Reggaeton", "Flamenco", "Afrobeat", "Afro House", "K-Pop", "J-Pop", "C-Pop", "Bollywood", "Tollywood", "Punjabi", "Ghazal", "Qawwali", "Carnatic", "Hindustani Classical", "Bhangra", "Devotional", "Sufi", "Ambient", "Chillout", "New Age", "Instrumental", "Acoustic", "Cinematic", "Soundtrack", "Musical Theatre", "Children's Music", "Phonk", "Drift Phonk", "Brazilian Phonk", "Funk Phonk", "Hyperpop", "Nightcore", "Vaporwave", "Synthwave", "Retrowave", "Chillwave", "Dreamwave", "Future Funk", "Glitch Hop", "Breakcore", "Jersey Club", "UK Garage", "Lo-fi", "Bedroom Pop", "Indie Pop", "Cloud Rap", "Emo Rap", "Rage", "PluggnB", "Sigilkore", "HexD", "Witch House", "Dark Trap", "Happy", "Sad", "Emotional", "Romantic", "Heartbreak", "Melancholic", "Nostalgic", "Peaceful", "Calm", "Relaxing", "Energetic", "Excited", "Angry", "Aggressive", "Dark", "Mysterious", "Hopeful", "Dreamy", "Euphoric", "Confident", "Motivational", "Inspirational", "Lonely", "Depressed", "Bittersweet", "Emotional Healing", "Powerful", "Spiritual", "Fearful", "Tense", "Dramatic", "Reflective", "Cozy", "Warm", "Playful", "Very Low Energy", "Low Energy", "Medium Energy", "High Energy", "Extreme Energy", "Workout", "Gym", "Running", "Cycling", "Driving", "Road Trip", "Gaming", "Coding", "Studying", "Reading", "Meditation", "Sleeping", "Focus", "Party", "Club", "Wedding", "Festival", "Cleaning", "Cooking", "Traveling", "Hiking", "Yoga", "Office Work", "Love", "Crush", "First Love", "Friendship", "Missing Someone", "Breakup", "Healing", "Self Love", "Revenge", "Motivation", "Victory", "Failure", "Hope", "Regret", "Gratitude", "Confidence", "Anxiety", "Loneliness", "Freedom", "Adventure", "Indian", "Western", "Korean", "Japanese", "Chinese", "Arabic", "African", "Latin American", "French", "Spanish", "German", "Russian", "Turkish", "Pakistani", "Bangladeshi", "Nepali", "Tamil", "Telugu", "Kannada", "Malayalam", "Bengali", "Marathi", "Gujarati", "Punjabi", "1950s", "1960s", "1970s", "1980s", "1990s", "2000s", "2010s", "2020s", "Latest Releases", "Old Classics", "Vintage", "Retro", "Male Vocal", "Female Vocal", "Duet", "Choir", "Instrumental", "A Cappella", "Rap", "Spoken Word", "Piano", "Guitar", "Violin", "Flute", "Saxophone", "Drums", "Cello", "Harp", "Bass", "Trumpet", "Electronic Synth", "Orchestra", "Movie Soundtrack", "TV Series", "Anime", "Game OST", "Background Score", "Trailer Music", "Documentary Music", "Rainy", "Winter", "Summer", "Autumn", "Spring", "Night", "Sunrise", "Sunset", "Space", "Ocean", "Forest", "City Lights", "Coffee Shop", "Campfire", "Beach", "Mountains", "Waltz", "Tango", "Salsa", "Bachata", "Zumba", "EDM Dance", "Shuffle", "Breakdance", "Hip-Hop Dance", "Contemporary", "Trending", "Viral", "Hidden Gems", "Underrated", "Chart Toppers", "Evergreen", "Classics", "New Releases", "Minimalist", "Experimental", "Avant-Garde", "Progressive", "Fusion", "Traditional", "Sad but Hopeful", "Happy Vibes", "Midnight Drive", "Rainy Night", "Late Night Coding", "Study Focus", "Deep Work", "Chill Evening", "Summer Vibes", "Beach Mood", "Coffee Shop Vibes", "Bedroom Vibes", "Gym Beast", "Pre-Workout", "Boss Mode", "Main Character", "Villain Arc", "Sigma", "Car Music", "Bass Boosted", "Headphones Only", "Emotional Rollercoaster", "Slow Burn", "Golden Oldies", "Wedding Songs", "Festival Anthems", "Family Time", "Sunday Morning", "Party Starter", "Calm Piano", "Epic Orchestra", "Fantasy", "Cyberpunk", "Sci-Fi", "Horror", "Mystery", "Romantic Dinner", "Sleep Sounds", "Nature Sounds"
+]
 
-        # Global Recommendations (True Global Hits)
-        try:
-            from datetime import datetime
-            current_year = datetime.now().year
-            results = ytmusic.search(f"Top 100 Global hit songs {current_year}", filter="songs", limit=50)
-            valid_results = [item for item in results if item.get("videoId") and item.get("videoId") != seed]
-            import random
-            random.shuffle(valid_results)
-            tracks = valid_results[:20]
-        except Exception:
-            # Fallback
-            tracks = ytmusic.search("top popular songs", filter="songs", limit=15)
-            
-        return [format_track(item) for item in tracks if item.get("videoId")]
+@app.get("/api/recommend")
+async def get_recommendations(seed: str):
+    try:
+        results = ytmusic.search(seed, filter="songs", limit=20)
+        tracks = [format_track(item) for item in results if item.get("videoId")]
+        return tracks[:20]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -521,7 +509,7 @@ async def analyze_track(track: TrackRequest):
             messages=[
                 {
                     "role": "system", 
-                    "content": "You are an expert music metadata extractor. You are provided with the full audio transcript of a song. First, try to recall factual information about this specific track from your broad knowledge base (the internet). If you recognize it, base your answers on known facts. If you don't recognize it, rely entirely on the provided transcript and hints to make your best prediction. Your task is to:\n1. Identify the primary language of the song based STRICTLY on the majority voice (whichever language occupies the majority of the track's lyrics by duration or volume). Do NOT pick a language just because of a featured artist if it's not the majority.\n2. Extract or infer the Artist Name ('ai_artist') and Album Name ('ai_album').\n3. Infer the mood, release_time (provide the EXACT release year or exact date if known, e.g., '2004' or '2004-05-12'), era, and a short 2-sentence description of the song's vibe.\n4. Predict audio stats (floats 0.0 to 1.0) for energy, valence, danceability, instrumentalness, and an integer for tempo (BPM).\n\nReturn ONLY a valid JSON object with keys: 'language', 'ai_artist', 'ai_album', 'mood', 'release_time', 'era', 'description', 'stats' (object with energy, valence, danceability, instrumentalness, tempo). Do not include markdown formatting."
+                    "content": "You are an expert music metadata extractor. You are provided with the full audio transcript of a song. First, try to recall factual information about this specific track from your broad knowledge base (the internet). If you recognize it, base your answers on known facts. If you don't recognize it, rely entirely on the provided transcript and hints to make your best prediction. Your task is to:\n1. Identify the primary language of the song based STRICTLY on the majority voice.\n2. Extract or infer the Artist Name ('ai_artist') and Album Name ('ai_album').\n3. Infer the mood, release_year (provide the EXACT release year as an INTEGER, e.g., 2004), era, and a short 2-sentence description of the song's vibe.\n4. Predict audio stats (floats 0.0 to 1.0) for energy, valence, danceability, instrumentalness, and an integer for tempo (BPM).\n5. From the MASTER LIST OF AESTHETIC TAGS provided below, select the top 2-3 most accurate tags that describe this song's specific vibe and subgenre. Output them as an array of strings in 'aesthetic_tags'.\n\nReturn ONLY a valid JSON object with keys: 'language', 'ai_artist', 'ai_album', 'mood', 'release_year', 'era', 'description', 'stats' (object with energy, valence, danceability, instrumentalness, tempo), 'aesthetic_tags' (array of strings).\n\nMASTER LIST OF AESTHETIC TAGS:\n" + ", ".join(AESTHETIC_TAGS)
                 },
                 {
                     "role": "user", 
@@ -538,13 +526,26 @@ async def analyze_track(track: TrackRequest):
         if os.path.exists(actual_file):
             os.remove(actual_file)
             
+        import re
+        release_year = analysis_result.get("release_year")
+        if isinstance(release_year, str):
+            digits = re.findall(r'\d{4}', release_year)
+            if digits:
+                release_year = int(digits[0])
+            else:
+                release_year = 2024
+        elif not isinstance(release_year, int):
+            release_year = 2024
+            
+        timeline_range = f"from {release_year - 5} to {release_year + 7}"
+
         return {
             "language": analysis_result.get("language", detected_language),
             "detected_language": detected_language,
             "ai_artist": analysis_result.get("ai_artist", track.artist),
             "ai_album": analysis_result.get("ai_album", "Unknown Album"),
             "mood": analysis_result.get("mood", "Energetic"),
-            "release_time": analysis_result.get("release_time", "Unknown"),
+            "release_time": str(release_year),
             "era": analysis_result.get("era", "Modern Era"),
             "description": analysis_result.get("description", f"A great song by {track.artist}."),
             "stats": analysis_result.get("stats", {
@@ -554,6 +555,8 @@ async def analyze_track(track: TrackRequest):
                 "instrumentalness": 0.0,
                 "tempo": 120
             }),
+            "aesthetic_tags": analysis_result.get("aesthetic_tags", ["Vibe"]),
+            "timeline_range": timeline_range,
             "recommendation_seed": track.id
         }
 

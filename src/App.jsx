@@ -484,7 +484,12 @@ function App() {
     if (!analysisResult) return;
     setIsRefreshingGlobal(true);
     try {
-      const recRes = await customFetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(analysisResult.recommendation_seed)}`);
+      const tags = (analysisResult.aesthetic_tags || []).join(" ");
+      const range = analysisResult.timeline_range || "";
+      const language = analysisResult.language || 'Bollywood';
+      const globalSeed = `${tags} global hits ${range} -${language}`;
+      
+      const recRes = await customFetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(globalSeed)}`);
       if (recRes.ok) {
         const recData = await recRes.json();
         setRecommendations(recData);
@@ -492,72 +497,23 @@ function App() {
     } catch(err) { console.error(err); }
     setIsRefreshingGlobal(false);
   };
-
-  const fetchMoreGlobal = async () => {
-    if (!analysisResult) return [];
-    setIsFetchingMoreGlobal(true);
-    try {
-      const recRes = await customFetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(analysisResult.recommendation_seed)}`);
-      if (recRes.ok) {
-        const recData = await recRes.json();
-        const newTracks = recData.filter(newTrack => !recommendations.some(t => t.id === newTrack.id));
-        setRecommendations(prev => {
-          const freshNewTracks = recData.filter(newTrack => !prev.some(t => t.id === newTrack.id));
-          return [...prev, ...freshNewTracks];
-        });
-        setIsFetchingMoreGlobal(false);
-        return newTracks;
-      }
-    } catch(err) { console.error(err); }
-    setIsFetchingMoreGlobal(false);
-    return [];
-  };
-
-  const handleScrollGlobal = (e) => {
-    const bottom = e.target.scrollHeight - e.target.scrollTop <= e.target.clientHeight + 20;
-    if (bottom && !isFetchingMoreGlobal && !isRefreshingGlobal) {
-      fetchMoreGlobal();
-    }
-  };
   
   const refreshGenre = async () => {
     if (!analysisResult || !selectedTrack) return;
     setIsRefreshingGenre(true);
     try {
-      const langRes = await customFetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(analysisResult.recommendation_seed)}&genre=${encodeURIComponent(selectedTrack.genre)}&video_id=${encodeURIComponent(selectedTrack.id)}`);
+      const tags = (analysisResult.aesthetic_tags || []).join(" ");
+      const range = analysisResult.timeline_range || "";
+      const language = analysisResult.language || 'Bollywood';
+      const localSeed = `${tags} ${language} songs ${range}`;
+      
+      const langRes = await customFetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(localSeed)}`);
       if (langRes.ok) {
         const langData = await langRes.json();
         setLanguageRecommendations(langData);
       }
     } catch(err) { console.error(err); }
     setIsRefreshingGenre(false);
-  };
-
-  const fetchMoreGenre = async () => {
-    if (!analysisResult) return [];
-    setIsFetchingMoreGenre(true);
-    try {
-      const langRes = await customFetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(analysisResult.recommendation_seed)}&genre=${encodeURIComponent(analysisResult.language)}&video_id=${encodeURIComponent(selectedTrack.id)}`);
-      if (langRes.ok) {
-        const langData = await langRes.json();
-        const newTracks = langData.filter(newTrack => !languageRecommendations.some(t => t.id === newTrack.id));
-        setLanguageRecommendations(prev => {
-          const freshNewTracks = langData.filter(newTrack => !prev.some(t => t.id === newTrack.id));
-          return [...prev, ...freshNewTracks];
-        });
-        setIsFetchingMoreGenre(false);
-        return newTracks;
-      }
-    } catch(err) { console.error(err); }
-    setIsFetchingMoreGenre(false);
-    return [];
-  };
-
-  const handleScrollGenre = (e) => {
-    const bottom = e.target.scrollHeight - e.target.scrollTop <= e.target.clientHeight + 20;
-    if (bottom && !isFetchingMoreGenre && !isRefreshingGenre) {
-      fetchMoreGenre();
-    }
   };
 
   const handleSearch = async (e) => {
@@ -635,14 +591,21 @@ function App() {
       const analysisData = await analyzeRes.json();
       setAnalysisResult(analysisData);
       
-      const recRes = await customFetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(analysisData.recommendation_seed)}&exclude_genre=${encodeURIComponent(analysisData.language || '')}`);
+      const tags = (analysisData.aesthetic_tags || []).join(" ");
+      const range = analysisData.timeline_range || "";
+      const language = analysisData.language || 'Bollywood';
+      
+      const localSeed = `${tags} ${language} songs ${range}`;
+      const globalSeed = `${tags} global hits ${range} -${language}`;
+      
+      const recRes = await customFetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(globalSeed)}`);
       if (recRes.ok) {
         const recData = await recRes.json();
         setRecommendations(recData);
       }
       
       // 3. Fetch Genre/Language specific recommendations using the AI detected language
-      const langRes = await customFetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(analysisData.recommendation_seed)}&genre=${encodeURIComponent(analysisData.language || 'Bollywood')}&video_id=${encodeURIComponent(track.id)}`);
+      const langRes = await customFetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(localSeed)}`);
       if (langRes.ok) {
         const langData = await langRes.json();
         setLanguageRecommendations(langData);
@@ -1278,7 +1241,7 @@ function App() {
                       <RefreshCw size={28} style={{ animation: isRefreshingGlobal ? 'spin 1s linear infinite' : 'none' }} />
                     </button>
                   </h2>
-                  <div className="list-view" style={{ minWidth: 0 }} onScroll={handleScrollGlobal}>
+                  <div className="list-view" style={{ minWidth: 0 }}>
                     {recommendations.map((track) => (
                       <div key={track.id} className="list-item-card" style={{
                         backgroundColor: currentPlayingTrack?.id === track.id ? 'hsla(var(--primary-hue), 30%, 20%, 0.9)' : undefined,
@@ -1313,7 +1276,7 @@ function App() {
                       <RefreshCw size={28} style={{ animation: isRefreshingGenre ? 'spin 1s linear infinite' : 'none' }} />
                     </button>
                   </h2>
-                  <div className="list-view" onScroll={handleScrollGenre}>
+                  <div className="list-view">
                     {languageRecommendations.map((track) => (
                       <div key={track.id} className="list-item-card" style={{ 
                         borderColor: 'var(--success-color)',
