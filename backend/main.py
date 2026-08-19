@@ -266,7 +266,7 @@ async def get_stream(video_id: str, title: Optional[str] = None, artist: Optiona
             'format': yt_format,
             'quiet': True,
             'no_warnings': True,
-            'extractor_args': {'youtube': {'player_client': ['android_vr', 'mweb']}},
+            'extractor_args': {'youtube': {'player_client': ['android']}},
         }
         if os.path.exists('cookies.txt'):
             ydl_opts['cookiefile'] = 'cookies.txt'
@@ -449,7 +449,7 @@ async def analyze_track(track: TrackRequest):
                 'quiet': True,
                 'no_warnings': True,
                 'ffmpeg_location': ffmpeg_path,
-                'extractor_args': {'youtube': {'player_client': ['android_vr', 'mweb']}},
+                'extractor_args': {'youtube': {'player_client': ['android']}},
             }
             if os.path.exists('cookies.txt'):
                 ydl_opts['cookiefile'] = 'cookies.txt'
@@ -503,9 +503,9 @@ async def analyze_track(track: TrackRequest):
         except Exception:
             pass
 
-        # 3. Analyze with Llama
+        # 3. Analyze with AI
         completion = await groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="openai/gpt-oss-20b",
             messages=[
                 {
                     "role": "system", 
@@ -561,6 +561,8 @@ async def analyze_track(track: TrackRequest):
         }
 
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         if os.path.exists(temp_file):
             os.remove(temp_file)
         raise HTTPException(status_code=500, detail=str(e))

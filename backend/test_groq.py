@@ -29,7 +29,7 @@ async def test_groq():
         track_title = "Unknown"
         
         completion = await client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="openai/gpt-oss-20b",
             messages=[
                 {"role": "system", "content": "You are an expert music metadata extractor. You are provided with the full audio transcript of a song. Your task is to:\n1. Identify the primary language of the song. If it's a mixture, return the language that is spoken the most.\n2. Extract or infer the Artist Name.\n3. Extract or infer the Album Name.\n\nReturn ONLY a valid JSON object with keys: 'primary_language', 'artist', 'album'. Do not include markdown formatting."},
                 {"role": "user", "content": f"Title Hint: {track_title}\nAudio Language Detected by Ear: {detected_language}\nFull Transcript:\n{transcription.text}"}
