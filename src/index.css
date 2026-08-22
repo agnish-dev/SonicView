@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+
 :root {
   --primary-hue: 260;
   --bg-color: hsl(var(--primary-hue), 20%, 5%);
@@ -13,8 +15,6 @@
   --font-family: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
   --transition-smooth: 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
-
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
 
 * {
   margin: 0;

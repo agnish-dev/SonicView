@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
-import { Music, ArrowLeft, Play, Activity, RefreshCw, Pause, SkipBack, SkipForward, Shuffle, X, Repeat, Heart, Mic2, ListMusic, Volume2, Network, ArrowRight, Zap, Triangle, Waves, Square, ActivitySquare, Hexagon, Search } from 'lucide-react';
+import { Music, ArrowLeft, Play, Activity, RefreshCw, Pause, SkipBack, SkipForward, Shuffle, X, Repeat, Heart, Mic2, ListMusic, Volume2, Network, ArrowRight, Zap, Triangle, Waves, Square, ActivitySquare, Hexagon, Search, Download, CheckCircle, Trash2 } from 'lucide-react';
+import Library from './Library.jsx';
+import { saveTrackToDB, getTrackFromDB, getAllSavedTracks, deleteTrackFromDB } from './utils/db.js';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
 
@@ -224,6 +226,30 @@ function GlobalPlayer({ track, streamUrl, isLoading, isPlaying, currentTime, dur
               </div>
               
               <div className="pill-progress">
+                <button 
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    const btn = e.currentTarget;
+                    const oldHtml = btn.innerHTML;
+                    btn.innerHTML = '⏳';
+                    try {
+                        const res = await fetch(streamUrl);
+                        const blob = await res.blob();
+                        const imgRes = await fetch(track.art);
+                        const imgBlob = await imgRes.blob();
+                        await saveTrackToDB(track, blob, imgBlob);
+                        btn.innerHTML = '✅';
+                    } catch(err) {
+                        btn.innerHTML = '❌';
+                        setTimeout(() => { btn.innerHTML = oldHtml; }, 2000);
+                    }
+                  }}
+                  className="control-btn" 
+                  title="Save for offline"
+                  style={{ marginRight: '10px' }}
+                >
+                  <Download size={16} />
+                </button>
                 <span className="pill-time">{formatTime(currentTime)}</span>
                 <div className="pill-wave-container">
                   <WavySlider 
@@ -270,6 +296,7 @@ function App() {
     }
   };
 
+  const [activeTab, setActiveTab] = useState('home');
   const [query, setQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
@@ -618,6 +645,30 @@ function App() {
     }
   };
 
+  
+  const handleOfflinePlay = async (track) => {
+    setSelectedTrack(track);
+    setCurrentPlayingTrack(track);
+    // Since we are offline, we can't analyze. Just set the stream URL directly from DB.
+    try {
+        const { getTrackFromDB } = await import('./utils/db.js');
+        const dbTrack = await getTrackFromDB(track.id);
+        if (dbTrack && dbTrack.audioBlob) {
+            const audioUrl = URL.createObjectURL(dbTrack.audioBlob);
+            setStreamUrl(audioUrl);
+            
+            // Mock analysis result so the player shows up
+            setAnalysisResult({
+                language: 'Offline',
+                aesthetic_tags: ['Offline'],
+                stats: { energy: 0.5, valence: 0.5, danceability: 0.5, instrumentalness: 0.5, tempo: 100 }
+            });
+        }
+    } catch (err) {
+        console.error(err);
+    }
+  };
+
   const resetSearch = () => {
     setSelectedTrack(null);
     setSearchResults([]);
@@ -693,8 +744,12 @@ function App() {
     <div className="app-wrapper">
       {/* App Logo & Quality Selector */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', zIndex: 100, position: 'relative' }}>
-        <div className="app-logo" onClick={resetSearch} style={{ cursor: 'pointer' }} title="Return to Home">
+        <div className="app-logo" onClick={() => { setActiveTab('home'); resetSearch(); }} style={{ cursor: 'pointer' }} title="Return to Home">
           <span className="app-logo-text">SonicView</span>
+        </div>
+        <div style={{ display: 'flex', gap: '1rem' }}>
+           <button onClick={() => setActiveTab('home')} style={{ background: activeTab === 'home' ? 'var(--accent-color)' : 'transparent', color: 'white', border: 'none', padding: '0.5rem 1rem', borderRadius: '24px', cursor: 'pointer', fontWeight: 'bold' }}>Home</button>
+           <button onClick={() => setActiveTab('library')} style={{ background: activeTab === 'library' ? 'var(--accent-color)' : 'transparent', color: 'white', border: 'none', padding: '0.5rem 1rem', borderRadius: '24px', cursor: 'pointer', fontWeight: 'bold' }}>Library</button>
         </div>
         <select 
           className="quality-selector"
