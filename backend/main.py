@@ -518,37 +518,75 @@ async def analyze_track(track: TrackRequest):
             pass
 
         # 3. Analyze with AI
-        system_prompt = f"""You are the UNIVERSAL LANGUAGE VERIFIER & EVIDENCE AGGREGATION ENGINE for Music DNA.
-You are provided with a song's audio transcript (from Whisper ASR), the ASR's initial language guess, and metadata hints.
+        system_prompt = f"""You are a dual-purpose AI for a music-analysis system:
+1. UNIVERSAL MULTIDIMENSIONAL LANGUAGE VERIFIER
+2. Music DNA Metadata Extractor
 
-Your tasks:
-1. Extract factual metadata: Artist Name ('ai_artist'), Album Name ('ai_album'), mood, EXACT release_year (integer), era, and a 2-sentence description of the vibe.
-2. Predict audio stats (0.0-1.0) for energy, valence, danceability, instrumentalness, and tempo (integer BPM).
-3. Select 2-3 tags from the MASTER LIST OF AESTHETIC TAGS.
-4. DEFINITIVELY PREDICT THE PRIMARY LANGUAGE using multiple linguistic & contextual features (Lexical, Grammatical, Script, Code-switching).
+PART 1: LANGUAGE VERIFICATION
+Your job is to independently verify the primary language of a song. Whisper's detected language is ONLY an initial hypothesis and must NOT be treated as ground truth.
 
-LANGUAGE IDENTIFICATION RULES:
-- Do NOT blindly rely on the ASR initial guess or the artist's region. Use total linguistic evidence.
-- Handle code-switching carefully (e.g., Hindi with English words). Find the TRUE primary language.
-- Compute a Final Confidence Score (0-100). 
-  * 90-100 = Confirmed, 75-89 = Probable, 50-74 = Needs Review, <50 = Low/Uncertain.
-- NEVER assume highly similar spoken languages (like Hindi vs Urdu) based on a few words. Analyze specific loanwords (Persian/Arabic vs Sanskrit) or script traces.
-- If confidence is < 50% or the languages are indistinguishably mixed, return 'Uncertain' as the Final Language.
+Perform MULTIDIMENSIONAL linguistic analysis:
+1. Grammar & sentence structure
+2. Function words & grammatical particles
+3. Overall vocabulary distribution
+4. Verb forms & morphology
+5. Pronunciation / phonology (from transcript cues)
+6. Script / writing system (if available)
+7. Dialect / regional linguistic patterns
+8. Code-switching / multilingual sections
+9. Contextual linguistic patterns
 
-Return ONLY a valid JSON object with the following keys:
-- 'language': The Final Primary Language string (or 'Uncertain').
-- 'language_confidence': Integer (0-100).
-- 'top_alternative_languages': Array of strings.
-- 'evidence_summary': Short sentence explaining WHY this language was chosen based on lexical/script evidence.
-- 'script_detected': String.
-- 'dialect': String (or null).
-- 'code_switching': Boolean.
-- 'ai_artist', 'ai_album', 'mood', 'release_year', 'era', 'description'
-- 'stats' (object with energy, valence, danceability, instrumentalness, tempo)
-- 'aesthetic_tags' (array of strings)
+IMPORTANT RULES FOR LANGUAGE:
+- Never classify a language from individual words.
+- Do NOT assume Sanskrit-derived words = Hindi.
+- Do NOT assume Persian/Arabic-derived words = Urdu.
+- Do NOT use artist nationality, song origin, title, genre, or release date as proof of language.
+- Compare the complete linguistic evidence.
+- Generate the top candidate languages with confidence scores.
+- If two languages are too close to distinguish, return an "ambiguous" or "insufficient_evidence" status and set the primary language to "Uncertain".
+
+PART 2: MUSIC DNA EXTRACTION
+1. Extract or infer the Artist Name ('ai_artist') and Album Name ('ai_album').
+2. Infer the mood, EXACT release_year (as an INTEGER, e.g. 2004), era, and a short 2-sentence description of the song's vibe.
+3. Predict audio stats (floats 0.0 to 1.0) for energy, valence, danceability, instrumentalness, and an integer for tempo (BPM).
+4. Select 2-3 tags from the MASTER LIST OF AESTHETIC TAGS below that describe this song's specific vibe and subgenre.
 
 MASTER LIST OF AESTHETIC TAGS:
 {", ".join(AESTHETIC_TAGS)}
+
+Return ONLY a valid JSON object with the following structure:
+{{
+  "primary_language": "string (or 'Uncertain')",
+  "language_confidence": 0,
+  "status": "confirmed | probable | ambiguous | insufficient_evidence",
+  "candidate_languages": [{{"language": "string", "confidence": 0}}],
+  "whisper_agrees": true,
+  "secondary_languages": ["string"],
+  "evidence": {{
+    "grammar": "string",
+    "function_words": "string",
+    "vocabulary": "string",
+    "phonology": "string",
+    "script": "string",
+    "dialect": "string",
+    "code_switching": "string"
+  }},
+  "evidence_summary": "string",
+  "ai_artist": "string",
+  "ai_album": "string",
+  "mood": "string",
+  "release_year": 2024,
+  "era": "string",
+  "description": "string",
+  "stats": {{
+    "energy": 0.0,
+    "valence": 0.0,
+    "danceability": 0.0,
+    "instrumentalness": 0.0,
+    "tempo": 0
+  }},
+  "aesthetic_tags": ["string"]
+}}
 """
         completion = await groq_client.chat.completions.create(
             model="openai/gpt-oss-20b",
@@ -559,7 +597,7 @@ MASTER LIST OF AESTHETIC TAGS:
                 },
                 {
                     "role": "user", 
-                    "content": f"Title Hint: {track.title}\nArtist Hint: {track.artist}\nExact Release Date (from iTunes): {itunes_date_hint}\nASR Initial Language Detected: {detected_language}\nFull Transcript:\n{transcription.text}"
+                    "content": f"Title Hint: {track.title}\nArtist Hint: {track.artist}\nExact Release Date: {itunes_date_hint}\nWhisper Detected Language: {detected_language}\nFull Transcript:\n{transcription.text}"
                 }
             ],
             response_format={"type": "json_object"}
@@ -584,15 +622,24 @@ MASTER LIST OF AESTHETIC TAGS:
             release_year = 2024
             
         timeline_range = f"from {release_year - 5} to {release_year + 7}"
+        
+        # Resolve Language Safely
+        status = analysis_result.get("status", "ambiguous")
+        if status in ["ambiguous", "insufficient_evidence"] or analysis_result.get("language_confidence", 0) < 50:
+            final_lang = "Uncertain"
+        else:
+            final_lang = analysis_result.get("primary_language", detected_language)
 
         return {
-            "language": analysis_result.get("language", detected_language),
+            "language": final_lang,
             "language_confidence": analysis_result.get("language_confidence", 100),
-            "top_alternative_languages": analysis_result.get("top_alternative_languages", []),
+            "status": status,
+            "candidate_languages": analysis_result.get("candidate_languages", []),
+            "whisper_agrees": analysis_result.get("whisper_agrees", True),
+            "evidence": analysis_result.get("evidence", {}),
             "evidence_summary": analysis_result.get("evidence_summary", "Standard verification."),
-            "script_detected": analysis_result.get("script_detected", "Unknown"),
-            "dialect": analysis_result.get("dialect", "Unknown"),
-            "code_switching": analysis_result.get("code_switching", False),
+            "script_detected": analysis_result.get("evidence", {}).get("script", "Unknown"),
+            "code_switching": bool(analysis_result.get("secondary_languages")),
             "detected_language": detected_language,
             "ai_artist": analysis_result.get("ai_artist", track.artist),
             "ai_album": analysis_result.get("ai_album", "Unknown Album"),
