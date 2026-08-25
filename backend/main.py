@@ -537,13 +537,11 @@ Perform MULTIDIMENSIONAL linguistic analysis:
 9. Contextual linguistic patterns
 
 IMPORTANT RULES FOR LANGUAGE:
-- Never classify a language from individual words.
-- Do NOT assume Sanskrit-derived words = Hindi.
-- Do NOT assume Persian/Arabic-derived words = Urdu.
-- Do NOT use artist nationality, song origin, title, genre, or release date as proof of language.
-- Compare the complete linguistic evidence.
+- **Do NOT be overly cautious.** If the transcript is clearly in a distinct language (e.g., English, Spanish, Korean, Punjabi), classify it confidently with a high score (80-100) and set status to "confirmed".
+- The "ambiguous" status should ONLY be used for truly indistinguishable edge cases (like a perfect 50/50 split of Hindi and Urdu vocabulary) or if the audio has virtually no lyrics.
+- Never classify a language from one or two isolated words, look at the whole text.
+- Do NOT assume Sanskrit-derived words = Hindi, or Persian/Arabic-derived = Urdu, but DO use them as weights to decide the dominant language.
 - Generate the top candidate languages with confidence scores.
-- If two languages are too close to distinguish, return an "ambiguous" or "insufficient_evidence" status and set the primary language to "Uncertain".
 
 PART 2: MUSIC DNA EXTRACTION
 1. Extract or infer the Artist Name ('ai_artist') and Album Name ('ai_album').
