@@ -147,7 +147,9 @@ async def get_piped_stream(video_id: str) -> str:
 @app.get("/api/search")
 async def search(q: str):
     try:
-        results = ytmusic.search(q, filter="songs")
+        # Removed filter="songs" because many original tracks (like Coke Studio) are categorized as "videos"
+        raw_results = ytmusic.search(q)
+        results = [item for item in raw_results if item.get("resultType") in ["song", "video"] or item.get("category") in ["Songs", "Videos"]]
         return [format_track(item) for item in results if item.get("videoId")]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
