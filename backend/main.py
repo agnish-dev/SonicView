@@ -518,16 +518,48 @@ async def analyze_track(track: TrackRequest):
             pass
 
         # 3. Analyze with AI
+        system_prompt = f"""You are the UNIVERSAL LANGUAGE VERIFIER & EVIDENCE AGGREGATION ENGINE for Music DNA.
+You are provided with a song's audio transcript (from Whisper ASR), the ASR's initial language guess, and metadata hints.
+
+Your tasks:
+1. Extract factual metadata: Artist Name ('ai_artist'), Album Name ('ai_album'), mood, EXACT release_year (integer), era, and a 2-sentence description of the vibe.
+2. Predict audio stats (0.0-1.0) for energy, valence, danceability, instrumentalness, and tempo (integer BPM).
+3. Select 2-3 tags from the MASTER LIST OF AESTHETIC TAGS.
+4. DEFINITIVELY PREDICT THE PRIMARY LANGUAGE using multiple linguistic & contextual features (Lexical, Grammatical, Script, Code-switching).
+
+LANGUAGE IDENTIFICATION RULES:
+- Do NOT blindly rely on the ASR initial guess or the artist's region. Use total linguistic evidence.
+- Handle code-switching carefully (e.g., Hindi with English words). Find the TRUE primary language.
+- Compute a Final Confidence Score (0-100). 
+  * 90-100 = Confirmed, 75-89 = Probable, 50-74 = Needs Review, <50 = Low/Uncertain.
+- NEVER assume highly similar spoken languages (like Hindi vs Urdu) based on a few words. Analyze specific loanwords (Persian/Arabic vs Sanskrit) or script traces.
+- If confidence is < 50% or the languages are indistinguishably mixed, return 'Uncertain' as the Final Language.
+
+Return ONLY a valid JSON object with the following keys:
+- 'language': The Final Primary Language string (or 'Uncertain').
+- 'language_confidence': Integer (0-100).
+- 'top_alternative_languages': Array of strings.
+- 'evidence_summary': Short sentence explaining WHY this language was chosen based on lexical/script evidence.
+- 'script_detected': String.
+- 'dialect': String (or null).
+- 'code_switching': Boolean.
+- 'ai_artist', 'ai_album', 'mood', 'release_year', 'era', 'description'
+- 'stats' (object with energy, valence, danceability, instrumentalness, tempo)
+- 'aesthetic_tags' (array of strings)
+
+MASTER LIST OF AESTHETIC TAGS:
+{", ".join(AESTHETIC_TAGS)}
+"""
         completion = await groq_client.chat.completions.create(
             model="openai/gpt-oss-20b",
             messages=[
                 {
                     "role": "system", 
-                    "content": "You are an expert music metadata extractor. You are provided with the full audio transcript of a song. First, try to recall factual information about this specific track from your broad knowledge base (the internet). If you recognize it, base your answers on known facts. If you don't recognize it, rely entirely on the provided transcript and hints to make your best prediction. Your task is to:\n1. Identify the primary language of the song based STRICTLY on the majority voice.\n2. Extract or infer the Artist Name ('ai_artist') and Album Name ('ai_album').\n3. Infer the mood, release_year (provide the EXACT release year as an INTEGER, e.g., 2004), era, and a short 2-sentence description of the song's vibe.\n4. Predict audio stats (floats 0.0 to 1.0) for energy, valence, danceability, instrumentalness, and an integer for tempo (BPM).\n5. From the MASTER LIST OF AESTHETIC TAGS provided below, select the top 2-3 most accurate tags that describe this song's specific vibe and subgenre. Output them as an array of strings in 'aesthetic_tags'.\n\nReturn ONLY a valid JSON object with keys: 'language', 'ai_artist', 'ai_album', 'mood', 'release_year', 'era', 'description', 'stats' (object with energy, valence, danceability, instrumentalness, tempo), 'aesthetic_tags' (array of strings).\n\nMASTER LIST OF AESTHETIC TAGS:\n" + ", ".join(AESTHETIC_TAGS)
+                    "content": system_prompt
                 },
                 {
                     "role": "user", 
-                    "content": f"Title Hint: {track.title}\nArtist Hint: {track.artist}\nExact Release Date (from iTunes): {itunes_date_hint}\nAudio Language Detected by Ear: {detected_language}\nFull Transcript:\n{transcription.text}"
+                    "content": f"Title Hint: {track.title}\nArtist Hint: {track.artist}\nExact Release Date (from iTunes): {itunes_date_hint}\nASR Initial Language Detected: {detected_language}\nFull Transcript:\n{transcription.text}"
                 }
             ],
             response_format={"type": "json_object"}
@@ -555,6 +587,12 @@ async def analyze_track(track: TrackRequest):
 
         return {
             "language": analysis_result.get("language", detected_language),
+            "language_confidence": analysis_result.get("language_confidence", 100),
+            "top_alternative_languages": analysis_result.get("top_alternative_languages", []),
+            "evidence_summary": analysis_result.get("evidence_summary", "Standard verification."),
+            "script_detected": analysis_result.get("script_detected", "Unknown"),
+            "dialect": analysis_result.get("dialect", "Unknown"),
+            "code_switching": analysis_result.get("code_switching", False),
             "detected_language": detected_language,
             "ai_artist": analysis_result.get("ai_artist", track.artist),
             "ai_album": analysis_result.get("ai_album", "Unknown Album"),
