@@ -410,9 +410,23 @@ AESTHETIC_TAGS = [
 @app.get("/api/recommend")
 async def get_recommendations(seed: str):
     try:
-        results = ytmusic.search(seed, filter="songs", limit=20)
-        tracks = [format_track(item) for item in results if item.get("videoId")]
-        return tracks[:20]
+        # Append exclusion terms to the YTMusic query
+        search_query = f"{seed} -mashup -remix"
+        results = ytmusic.search(search_query, filter="songs", limit=40)
+        
+        tracks = []
+        exclude_terms = ["mashup", "remix", "mixtape", "non stop", "nonstop", "megamix"]
+        
+        for item in results:
+            if item.get("videoId"):
+                title_lower = item.get("title", "").lower()
+                # Strict backend filtering to ensure none slip through
+                if not any(term in title_lower for term in exclude_terms):
+                    tracks.append(format_track(item))
+                    if len(tracks) >= 20:
+                        break
+                        
+        return tracks
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
