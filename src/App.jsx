@@ -516,7 +516,7 @@ function App() {
       const language = analysisResult.language || 'Bollywood';
       const globalSeed = `${tags} international English songs ${range}`;
       
-      const recRes = await customFetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(globalSeed)}`);
+      const recRes = await customFetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(globalSeed)}&target_year=${analysisResult?.release_time || analysisData?.release_time || ''}`);
       if (recRes.ok) {
         const recData = await recRes.json();
         setRecommendations(recData);
@@ -534,7 +534,7 @@ function App() {
       const language = analysisResult.language || 'Bollywood';
       const localSeed = `${tags} ${language} songs ${range}`;
       
-      const langRes = await customFetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(localSeed)}`);
+      const langRes = await customFetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(localSeed)}&target_year=${analysisResult?.release_time || analysisData?.release_time || ''}`);
       if (langRes.ok) {
         const langData = await langRes.json();
         setLanguageRecommendations(langData);
@@ -625,14 +625,14 @@ function App() {
       const localSeed = `${tags} ${language} songs ${range}`;
       const globalSeed = `${tags} international English songs ${range}`;
       
-      const recRes = await customFetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(globalSeed)}`);
+      const recRes = await customFetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(globalSeed)}&target_year=${analysisResult?.release_time || analysisData?.release_time || ''}`);
       if (recRes.ok) {
         const recData = await recRes.json();
         setRecommendations(recData);
       }
       
       // 3. Fetch Genre/Language specific recommendations using the AI detected language
-      const langRes = await customFetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(localSeed)}`);
+      const langRes = await customFetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(localSeed)}&target_year=${analysisResult?.release_time || analysisData?.release_time || ''}`);
       if (langRes.ok) {
         const langData = await langRes.json();
         setLanguageRecommendations(langData);
