@@ -742,25 +742,36 @@ function App() {
 
   return (
     <div className="app-wrapper">
-      {/* App Logo & Quality Selector */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', zIndex: 100, position: 'relative' }}>
-        <div className="app-logo" onClick={() => { setActiveTab('home'); resetSearch(); }} style={{ cursor: 'pointer' }} title="Return to Home">
-          <span className="app-logo-text">SonicView</span>
-        </div>
+      {/* Top Navigation Bar */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', padding: '1.5rem 2rem 0 2rem', zIndex: 100, position: 'relative' }}>
+        {/* Left: Home / Library */}
         <div style={{ display: 'flex', gap: '1rem' }}>
            <button onClick={() => setActiveTab('home')} style={{ background: activeTab === 'home' ? 'var(--accent-color)' : 'transparent', color: 'white', border: 'none', padding: '0.5rem 1rem', borderRadius: '24px', cursor: 'pointer', fontWeight: 'bold' }}>Home</button>
            <button onClick={() => setActiveTab('library')} style={{ background: activeTab === 'library' ? 'var(--accent-color)' : 'transparent', color: 'white', border: 'none', padding: '0.5rem 1rem', borderRadius: '24px', cursor: 'pointer', fontWeight: 'bold' }}>Library</button>
         </div>
-        <select 
-          className="quality-selector"
-          value={audioQuality} 
-          onChange={(e) => setAudioQuality(e.target.value)}
-          title="Audio Quality"
-        >
-          <option value="standard">Standard</option>
-          <option value="good">Good</option>
-          <option value="high">High Definition</option>
-        </select>
+
+        {/* Middle: Quality Selector */}
+        <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
+          <select 
+            className="quality-selector"
+            value={audioQuality} 
+            onChange={(e) => setAudioQuality(e.target.value)}
+            title="Audio Quality"
+            style={{ margin: 0 }}
+          >
+            <option value="standard">Standard</option>
+            <option value="good">Good</option>
+            <option value="high">High Definition</option>
+          </select>
+        </div>
+        
+        {/* Right side placeholder */}
+        <div style={{ width: '100px' }}></div>
+      </div>
+
+      {/* App Logo */}
+      <div className="app-logo" onClick={() => { setActiveTab('home'); resetSearch(); }} style={{ cursor: 'pointer', position: 'static', paddingLeft: '2rem', marginTop: '1.5rem', marginBottom: '2rem' }} title="Return to Home">
+        <span className="app-logo-text">SonicView</span>
       </div>
 
       {/* Global Top-Right Search Bar */}
