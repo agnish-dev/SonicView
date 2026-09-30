@@ -514,7 +514,7 @@ function App() {
       const tags = (analysisResult.aesthetic_tags || []).join(" ");
       const range = analysisResult.timeline_range || "";
       const language = analysisResult.language || 'Bollywood';
-      const globalSeed = `${tags} global hits ${range} -${language}`;
+      const globalSeed = `${tags} international English songs ${range}`;
       
       const recRes = await customFetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(globalSeed)}`);
       if (recRes.ok) {
@@ -623,7 +623,7 @@ function App() {
       const language = analysisData.language || 'Bollywood';
       
       const localSeed = `${tags} ${language} songs ${range}`;
-      const globalSeed = `${tags} global hits ${range} -${language}`;
+      const globalSeed = `${tags} international English songs ${range}`;
       
       const recRes = await customFetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(globalSeed)}`);
       if (recRes.ok) {
