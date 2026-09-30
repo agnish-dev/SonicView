@@ -970,30 +970,32 @@ function App() {
                     <p className="hero-subtitle">
                       Discover the science behind sound. Transform audio into intelligent Music DNA profiles, revealing hidden emotional landscapes, sonic similarities, and the intricate architecture of every track. Dive deeper into the world of music and uncover connections that were never meant to be seen, only heard.
                     </p>
-                    <form ref={heroSearchRef} className="search-hero" onSubmit={handleSearch} style={{ position: 'relative' }}>
-                      <Search color="var(--text-muted)" size={20} />
-                      <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center' }}>
-                        <input 
-                          type="text" 
-                          placeholder="Search your favourite music..."
-                          value={query}
-                          onChange={handleInputChange}
-                          onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
-                          onClick={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
-                          style={{ width: '100%', paddingRight: query ? '40px' : '16px' }}
-                        />
-                        {query && (
-                          <button type="button" onClick={() => { setQuery(''); setShowSuggestions(false); }} style={{ position: 'absolute', right: '10px', background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', padding: '4px' }}>
-                            <X size={18} />
-                          </button>
-                        )}
-                      </div>
-                      <button type="submit" className="search-hero-btn">
-                        Search
-                      </button>
+                    <div ref={heroSearchRef} style={{ width: '100%', maxWidth: '500px' }}>
+                      <form className="search-hero" onSubmit={handleSearch} style={{ position: 'relative', maxWidth: 'none' }}>
+                        <Search color="var(--text-muted)" size={20} />
+                        <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center' }}>
+                          <input 
+                            type="text" 
+                            placeholder="Search your favourite music..."
+                            value={query}
+                            onChange={handleInputChange}
+                            onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
+                            onClick={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
+                            style={{ width: '100%', paddingRight: query ? '40px' : '16px' }}
+                          />
+                          {query && (
+                            <button type="button" onClick={() => { setQuery(''); setShowSuggestions(false); }} style={{ position: 'absolute', right: '10px', background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', padding: '4px' }}>
+                              <X size={18} />
+                            </button>
+                          )}
+                        </div>
+                        <button type="submit" className="search-hero-btn">
+                          Search
+                        </button>
+                      </form>
                       
                       {showSuggestions && suggestions.length > 0 && (
-                        <div className="suggestions-dropdown" style={{ top: '100%', left: 0, right: 0, marginTop: '1rem', position: 'absolute' }}>
+                        <div className="suggestions-dropdown" style={{ position: 'static', marginTop: '1rem', width: '100%', maxHeight: '400px', overflowY: 'auto' }}>
                           {suggestions.map((track) => (
                             <div key={track.id} className="suggestion-item" onClick={() => {
                               setQuery(track.title);
@@ -1012,7 +1014,7 @@ function App() {
                           ))}
                         </div>
                       )}
-                    </form>
+                    </div>
                   </div>
                   <div className="hero-right">
                     <img src="/dna.png" alt="DNA Soundwave" className="hero-img" style={{ mixBlendMode: 'screen', pointerEvents: 'none' }} />
