@@ -325,8 +325,8 @@ async def get_stream(video_id: str, title: Optional[str] = None, artist: Optiona
         if not stream_url:
             raise Exception("Failed to extract stream URL from all sources.")
             
-        proxy_url = f"/api/proxy_stream?url={urllib.parse.quote(stream_url)}"
-        return {"stream_url": proxy_url, "skip_segments": skip_segments}
+        # Direct URL instead of proxy to prevent massive buffering and Blob downloads
+        return {"stream_url": stream_url, "skip_segments": skip_segments}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
