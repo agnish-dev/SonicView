@@ -765,36 +765,11 @@ function App() {
           </select>
         </div>
         
-        {/* Right side: Install App Button */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', minWidth: '120px' }}>
-          {deferredPrompt && (
-            <button 
-              onClick={handleInstallClick}
-              style={{
-                background: 'var(--accent-color)',
-                color: 'white',
-                border: 'none',
-                padding: '0.5rem 1rem',
-                borderRadius: '24px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(111, 76, 255, 0.3)'
-              }}>
-              + Install App
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* App Logo */}
-      <div className="app-logo" onClick={() => { setActiveTab('home'); resetSearch(); }} style={{ cursor: 'pointer', position: 'static', paddingLeft: '2rem', marginTop: '1.5rem', marginBottom: '2rem' }} title="Return to Home">
-        <span className="app-logo-text">SonicView</span>
-      </div>
-
-      {/* Global Top-Right Search Bar */}
-      {(selectedTrack || searchResults.length > 0) && (
-        <div style={{ position: 'absolute', top: '34px', right: '2rem', zIndex: 100 }}>
-          <form ref={topSearchRef} onSubmit={async (e) => {
+        {/* Right side: Global Search + Install App Button */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', minWidth: '120px' }}>
+          {/* Global Search Bar */}
+          {(selectedTrack || searchResults.length > 0) && (
+<form ref={topSearchRef} onSubmit={async (e) => {
             e.preventDefault();
             if (!query.trim()) return;
             try {
@@ -832,6 +807,68 @@ function App() {
                   <X size={16} />
                 </button>
               )}
+            </div>
+            <button type="submit" style={{
+              background: 'var(--accent-color)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '24px',
+              padding: '0.5rem 1.25rem',
+              cursor: 'pointer',
+              fontWeight: '600'
+            }}>
+              Search
+            </button>
+            
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="suggestions-dropdown" style={{ top: '100%', right: 0, width: '320px', marginTop: '0.5rem', position: 'absolute', zIndex: 10 }}>
+                {suggestions.map((track) => (
+                  <div key={track.id} className="suggestion-item" onClick={() => {
+                    setQuery(track.title);
+                    setShowSuggestions(false);
+                    handleTrackSelect(track);
+                  }}>
+                    <img src={track.art} alt={track.title} className="suggestion-art" />
+                    <div className="suggestion-info">
+                      <div className="suggestion-header">
+                        <span className="suggestion-title">{track.title}</span>
+                        <span className="suggestion-duration">{track.duration}</span>
+                      </div>
+                      <span className="suggestion-artist">{track.artist}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </form>
+          )}
+
+          {/* Install App Button */}
+          {deferredPrompt && (
+            <button 
+              onClick={handleInstallClick}
+              style={{
+                background: 'var(--accent-color)',
+                color: 'white',
+                border: 'none',
+                padding: '0.5rem 1rem',
+                borderRadius: '24px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(111, 76, 255, 0.3)'
+              }}>
+              + Install App
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* App Logo */}
+      <div className="app-logo" onClick={() => { setActiveTab('home'); resetSearch(); }} style={{ cursor: 'pointer', position: 'static', paddingLeft: '2rem', marginTop: '1.5rem', marginBottom: '2rem' }} title="Return to Home">
+        <span className="app-logo-text">SonicView</span>
+      </div>
+
+
             </div>
             <button type="submit" style={{
               background: 'var(--accent-color)',
