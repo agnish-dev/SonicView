@@ -765,8 +765,25 @@ function App() {
           </select>
         </div>
         
-        {/* Right side placeholder */}
-        <div style={{ width: '100px' }}></div>
+        {/* Right side: Install App Button */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', minWidth: '120px' }}>
+          {deferredPrompt && (
+            <button 
+              onClick={handleInstallClick}
+              style={{
+                background: 'var(--accent-color)',
+                color: 'white',
+                border: 'none',
+                padding: '0.5rem 1rem',
+                borderRadius: '24px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(111, 76, 255, 0.3)'
+              }}>
+              + Install App
+            </button>
+          )}
+        </div>
       </div>
 
       {/* App Logo */}
@@ -954,25 +971,7 @@ function App() {
             {(!isSearching && searchResults.length === 0) && (
               <>
                 <div className="hero-section" style={{ position: 'relative' }}>
-                  {deferredPrompt && (
-                    <button 
-                      onClick={handleInstallClick}
-                      style={{
-                        position: 'absolute',
-                        top: '-20px',
-                        right: '0px',
-                        background: 'var(--accent-color)',
-                        color: 'white',
-                        border: 'none',
-                        padding: '0.5rem 1rem',
-                        borderRadius: '24px',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        boxShadow: '0 4px 12px rgba(111, 76, 255, 0.3)'
-                      }}>
-                      + Install App
-                    </button>
-                  )}
+
                   <div className="hero-left">
                     <h1 className="hero-title">
                       Unlocking the <br/>
