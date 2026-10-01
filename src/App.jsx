@@ -233,13 +233,23 @@ function GlobalPlayer({ track, streamUrl, isLoading, isPlaying, currentTime, dur
                     const oldHtml = btn.innerHTML;
                     btn.innerHTML = '⏳';
                     try {
-                        const res = await fetch(streamUrl);
+                        const targetStream = streamUrl.startsWith('http') && !streamUrl.includes('/api/proxy') 
+                          ? `${API_BASE}/api/proxy_stream?url=${encodeURIComponent(streamUrl)}` 
+                          : streamUrl;
+                        const res = await customFetch(targetStream);
+                        if (!res.ok) throw new Error("Stream fetch failed");
                         const blob = await res.blob();
-                        const imgRes = await fetch(track.art);
+                        
+                        let imgRes = await fetch(track.art).catch(() => null);
+                        if (!imgRes || !imgRes.ok) {
+                            imgRes = await customFetch(`${API_BASE}/api/proxy_stream?url=${encodeURIComponent(track.art)}`);
+                        }
                         const imgBlob = await imgRes.blob();
+                        
                         await saveTrackToDB(track, blob, imgBlob);
                         btn.innerHTML = '✅';
                     } catch(err) {
+                        console.error('Download error:', err);
                         btn.innerHTML = '❌';
                         setTimeout(() => { btn.innerHTML = oldHtml; }, 2000);
                     }
