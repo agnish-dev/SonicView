@@ -113,7 +113,7 @@ header p {
 /* Global Player Pill Container */
 .global-player-pill-container {
   position: fixed;
-  top: 20px;
+  bottom: 30px;
   left: 0;
   width: 100%;
   display: flex;
@@ -121,11 +121,11 @@ header p {
   align-items: center;
   z-index: 1000;
   pointer-events: none; /* Let clicks pass through except on the player */
-  animation: slideDownCentered 0.3s ease-out forwards;
+  animation: slideUpCentered 0.3s ease-out forwards;
 }
 
-@keyframes slideDownCentered {
-  from { transform: translateY(-150%); }
+@keyframes slideUpCentered {
+  from { transform: translateY(150%); }
   to { transform: translateY(0); }
 }
 
