@@ -869,42 +869,7 @@ function App() {
       </div>
 
 
-            </div>
-            <button type="submit" style={{
-              background: 'var(--accent-color)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '24px',
-              padding: '0.5rem 1.25rem',
-              cursor: 'pointer',
-              fontWeight: '600'
-            }}>
-              Search
-            </button>
-            
-            {showSuggestions && suggestions.length > 0 && (
-              <div className="suggestions-dropdown" style={{ top: '100%', right: 0, width: '320px', marginTop: '0.5rem', position: 'absolute', zIndex: 10 }}>
-                {suggestions.map((track) => (
-                  <div key={track.id} className="suggestion-item" onClick={() => {
-                    setQuery(track.title);
-                    setShowSuggestions(false);
-                    handleTrackSelect(track);
-                  }}>
-                    <img src={track.art} alt={track.title} className="suggestion-art" />
-                    <div className="suggestion-info">
-                      <div className="suggestion-header">
-                        <span className="suggestion-title">{track.title}</span>
-                        <span className="suggestion-duration">{track.duration}</span>
-                      </div>
-                      <span className="suggestion-artist">{track.artist}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </form>
-        </div>
-      )}
+
 
       {/* Root Audio Element */}
       <div style={{ display: 'none' }}>
