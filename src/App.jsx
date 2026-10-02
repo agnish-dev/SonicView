@@ -526,7 +526,12 @@ function App() {
       const language = analysisResult.language || 'Bollywood';
       const globalSeed = `${tags} international English songs ${range}`;
       
-      const recRes = await customFetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(globalSeed)}&target_year=${analysisResult?.release_time || analysisData?.release_time || ''}`);
+      const dnaString = encodeURIComponent(JSON.stringify(analysisResult.stats) + " | " + tags + " | Mood: " + (analysisResult.mood || ""));
+      const titleStr = encodeURIComponent(selectedTrack?.title || "Unknown");
+      const artistStr = encodeURIComponent(selectedTrack?.artist || "Unknown");
+      const targetYearStr = analysisResult?.release_time || '';
+      
+      const recRes = await customFetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(globalSeed)}&target_year=${targetYearStr}&title=${titleStr}&artist=${artistStr}&dna=${dnaString}`);
       if (recRes.ok) {
         const recData = await recRes.json();
         setRecommendations(recData);
@@ -544,7 +549,12 @@ function App() {
       const language = analysisResult.language || 'Bollywood';
       const localSeed = `${tags} ${language} songs ${range}`;
       
-      const langRes = await customFetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(localSeed)}&target_year=${analysisResult?.release_time || analysisData?.release_time || ''}`);
+      const dnaString = encodeURIComponent(JSON.stringify(analysisResult.stats) + " | " + tags + " | Mood: " + (analysisResult.mood || ""));
+      const titleStr = encodeURIComponent(selectedTrack?.title || "Unknown");
+      const artistStr = encodeURIComponent(selectedTrack?.artist || "Unknown");
+      const targetYearStr = analysisResult?.release_time || '';
+      
+      const langRes = await customFetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(localSeed)}&target_year=${targetYearStr}&title=${titleStr}&artist=${artistStr}&dna=${dnaString}`);
       if (langRes.ok) {
         const langData = await langRes.json();
         setLanguageRecommendations(langData);
@@ -635,14 +645,19 @@ function App() {
       const localSeed = `${tags} ${language} songs ${range}`;
       const globalSeed = `${tags} international English songs ${range}`;
       
-      const recRes = await customFetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(globalSeed)}&target_year=${analysisResult?.release_time || analysisData?.release_time || ''}`);
+      const dnaString = encodeURIComponent(JSON.stringify(analysisData.stats) + " | " + tags + " | Mood: " + (analysisData.mood || ""));
+      const titleStr = encodeURIComponent(track.title);
+      const artistStr = encodeURIComponent(track.artist);
+      const targetYearStr = analysisResult?.release_time || analysisData?.release_time || '';
+      
+      const recRes = await customFetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(globalSeed)}&target_year=${targetYearStr}&title=${titleStr}&artist=${artistStr}&dna=${dnaString}`);
       if (recRes.ok) {
         const recData = await recRes.json();
         setRecommendations(recData);
       }
       
       // 3. Fetch Genre/Language specific recommendations using the AI detected language
-      const langRes = await customFetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(localSeed)}&target_year=${analysisResult?.release_time || analysisData?.release_time || ''}`);
+      const langRes = await customFetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(localSeed)}&target_year=${targetYearStr}&title=${titleStr}&artist=${artistStr}&dna=${dnaString}`);
       if (langRes.ok) {
         const langData = await langRes.json();
         setLanguageRecommendations(langData);

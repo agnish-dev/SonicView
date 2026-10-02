@@ -421,7 +421,7 @@ AESTHETIC_TAGS = [
 ]
 
 @app.get("/api/recommend")
-async def get_recommendations(seed: str, target_year: int = None):
+async def get_recommendations(seed: str, target_year: int = None, title: str = "Unknown", artist: str = "Unknown", dna: str = "Unknown"):
     try:
         # Append exclusion terms to the YTMusic query
         search_query = f"{seed} -mashup -remix"
@@ -437,78 +437,113 @@ async def get_recommendations(seed: str, target_year: int = None):
                 # Strict backend filtering to ensure none slip through
                 if not any(term in title_lower for term in exclude_terms):
                     tracks.append(format_track(item))
-                    if len(tracks) >= 30:
+                    if len(tracks) >= 40:
                         break
                         
-        # DYNAMIC TIMELINE RE-RANKING LOGIC
-        if target_year and len(tracks) > 0:
+        if len(tracks) > 0:
             try:
                 import json
-                # Create a lightweight mapping for the LLM
-                payload = {str(i): f"{t.get('title')} by {t.get('artist')}" for i, t in enumerate(tracks)}
+                # Create a mapping for the LLM
+                candidates_str = json.dumps([{
+                    "id": str(i),
+                    "title": t.get("title"),
+                    "artist": t.get("artist")
+                } for i, t in enumerate(tracks)], indent=2)
                 
-                prompt = f"""You are a music metadata expert. 
-Given this JSON dictionary mapping track indices to track names and artists, estimate the original release year for each track.
-Return ONLY a valid JSON dictionary mapping the EXACT SAME indices (as strings) to the integer year.
-Example output: {{"0": 2012, "1": 1998, "2": 2024}}
-Input:
-{json.dumps(payload)}"""
+                prompt = f"""You are SonicView's Music Recommendation Engine.
 
-                # Use Groq to quickly guess the release years for all 30 fetched tracks
+Your task is to recommend exactly 20 songs based on the user's selected song.
+
+The goal is NOT to recommend songs that are simply from the same genre or artist.
+The goal is to find songs that would genuinely feel musically close to the selected song.
+
+Consider these factors in order of importance:
+
+1. Acoustic / Music DNA similarity
+2. Mood and emotional character
+3. Tempo and rhythmic characteristics
+4. Instrumentation and sonic texture
+5. Vocal characteristics
+6. Genre and subgenre
+7. Production style
+8. Release-era similarity
+9. Current relevance and popularity
+
+The selected song is the primary reference.
+
+Prefer music from approximately ±5 years of the selected song's release year,
+but you may go outside this range when a song has significantly stronger
+musical similarity.
+
+Favor songs that are relevant to today's music landscape, but DO NOT recommend
+a song merely because it is currently popular.
+
+Avoid:
+- Generic genre matches
+- Artist-only matches
+- Songs that are famous but musically unrelated
+- Duplicate artists when better alternatives exist
+- Excessively obvious recommendations
+- Songs with weak similarity just to fill the list
+
+Create exactly 20 recommendations and rank them from highest to lowest
+musical relevance. CHOOSE ONLY FROM THE CANDIDATE SONGS LISTED BELOW.
+
+For each song provide:
+
+{{
+  "rank": 1,
+  "id": "...",
+  "title": "...",
+  "artist": "...",
+  "release_year": 2024,
+  "similarity_score": 94,
+  "reason": "..."
+}}
+
+Return ONLY valid JSON in this exact format:
+{{
+  "recommendations": [ ... ]
+}}
+
+SELECTED SONG:
+Title: {title}
+Artist: {artist}
+Release Year: {target_year or 'Unknown'}
+
+MUSIC DNA:
+{dna}
+
+CANDIDATE SONGS:
+{candidates_str}"""
+
                 completion = await groq_client.chat.completions.create(
                     messages=[{"role": "user", "content": prompt}],
-                    model="llama3-8b-8192",  # extremely fast model for simple classification
-                    temperature=0,
+                    model="llama-3.3-70b-versatile",  
+                    temperature=0.3,
                     response_format={"type": "json_object"}
                 )
                 
-                year_map = json.loads(completion.choices[0].message.content.strip())
+                response_json = json.loads(completion.choices[0].message.content.strip())
+                recs = response_json.get("recommendations", [])
                 
-                scored_tracks = []
-                for i, track in enumerate(tracks):
-                    est_year_val = year_map.get(str(i), target_year)
-                    try:
-                        est_year = int(est_year_val)
-                    except:
-                        est_year = target_year
-                        
-                    diff = abs(est_year - target_year)
-                    # Simple scoring: Closer to target year = higher Era score
-                    era_score = max(0, 15 - (diff * 2))
-                    final_score = 60 + era_score  # Assume base DNA match score is 60
-                    
-                    track["_final_score"] = final_score
-                    track["_diff"] = diff
-                    track["_est_year"] = est_year # for debugging/displaying if needed
-                    scored_tracks.append((diff, track))
-                    
-                # 1. Filter: start with ±4 years
-                best_matches = [t for d, t in scored_tracks if d <= 4]
+                # Map back to original tracks
+                best_matches = []
+                for rec in recs:
+                    track_id_str = str(rec.get("id"))
+                    if track_id_str.isdigit() and int(track_id_str) < len(tracks):
+                        t = tracks[int(track_id_str)]
+                        t["_similarity_score"] = rec.get("similarity_score")
+                        t["_reason"] = rec.get("reason")
+                        best_matches.append(t)
                 
-                # 2. Fallback: if not enough matches, expand to ±6 years
-                if len(best_matches) < 10:
-                    best_matches = [t for d, t in scored_tracks if d <= 6]
-                    
-                # 3. Last Resort: fallback to all if it's a very niche genre
-                if len(best_matches) < 10:
-                    best_matches = [t for d, t in scored_tracks]
-                    
-                # Re-rank by the final combined score
-                best_matches.sort(key=lambda x: x.get("_final_score", 0), reverse=True)
-                
-                # Cleanup internal fields
-                for t in best_matches:
-                    t.pop("_final_score", None)
-                    t.pop("_diff", None)
-                    t.pop("_est_year", None)
-                    
-                # Return the top 15 after strict dynamic timeline re-ranking
-                return best_matches[:15]
+                if best_matches:
+                    return best_matches[:20]
             except Exception as e:
-                print(f"Timeline Re-ranking error: {e}")
+                print(f"AI Recommendation error: {e}")
                 pass # Fallback to standard tracking if LLM fails
                 
-        return tracks[:15]
+        return tracks[:20]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
