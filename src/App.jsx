@@ -794,20 +794,7 @@ function App() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', minWidth: '120px' }}>
           {/* Global Search Bar */}
           {(selectedTrack || searchResults.length > 0) && (
-<form ref={topSearchRef} onSubmit={async (e) => {
-            e.preventDefault();
-            if (!query.trim()) return;
-            try {
-              const res = await customFetch(`${API_BASE}/api/search?q=${encodeURIComponent(query)}`);
-              if (res.ok) {
-                const data = await res.json();
-                setSuggestions(data.slice(0, 20));
-                setShowSuggestions(true);
-              }
-            } catch (err) {
-              console.error(err);
-            }
-          }} style={{ display: 'flex', gap: '0.5rem', position: 'relative' }}>
+<form ref={topSearchRef} onSubmit={handleSearch} style={{ display: 'flex', gap: '0.5rem', position: 'relative' }}>
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
               <input
                 type="text"
