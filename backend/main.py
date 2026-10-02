@@ -304,6 +304,7 @@ async def get_stream(video_id: str, title: Optional[str] = None, artist: Optiona
 
         # 2. Extract stream URL
         stream_url = ""
+        video_url = ""
         try:
             # Primary: yt-dlp with client spoofing
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -314,6 +315,20 @@ async def get_stream(video_id: str, title: Optional[str] = None, artist: Optiona
                 elif not url and 'formats' in info:
                     url = info['formats'][-1]['url']
                 stream_url = url
+                
+                # Extract background video URL
+                if 'formats' in info:
+                    # Look for low res MP4 video streams
+                    v_formats = [f for f in info['formats'] if f.get('vcodec') != 'none' and f.get('height', 0) and f.get('height', 0) <= 480 and f.get('ext') == 'mp4']
+                    if v_formats:
+                        v_formats.sort(key=lambda x: x.get('height', 0), reverse=True)
+                        video_url = v_formats[0].get('url')
+                    else:
+                        # Fallback to any mp4 with video
+                        any_v = [f for f in info['formats'] if f.get('vcodec') != 'none' and f.get('ext') == 'mp4']
+                        if any_v:
+                            video_url = any_v[0].get('url')
+                            
         except Exception as e:
             print(f"yt-dlp failed: {e}")
             
@@ -326,7 +341,7 @@ async def get_stream(video_id: str, title: Optional[str] = None, artist: Optiona
             raise Exception("Failed to extract stream URL from all sources.")
             
         # Direct URL instead of proxy to prevent massive buffering and Blob downloads
-        return {"stream_url": stream_url, "skip_segments": skip_segments}
+        return {"stream_url": stream_url, "video_url": video_url, "skip_segments": skip_segments}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
