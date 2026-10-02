@@ -426,7 +426,7 @@ async def get_recommendations(seed: str, target_year: int = None, title: str = "
         # Append exclusion terms to the YTMusic query
         search_query = f"{seed} -mashup -remix"
         # Fetch more results initially to give the re-ranker enough options
-        results = ytmusic.search(search_query, filter="songs", limit=50)
+        results = ytmusic.search(search_query, filter="songs", limit=80)
         
         tracks = []
         exclude_terms = ["mashup", "remix", "mixtape", "non stop", "nonstop", "megamix"]
@@ -437,7 +437,7 @@ async def get_recommendations(seed: str, target_year: int = None, title: str = "
                 # Strict backend filtering to ensure none slip through
                 if not any(term in title_lower for term in exclude_terms):
                     tracks.append(format_track(item))
-                    if len(tracks) >= 40:
+                    if len(tracks) >= 60:
                         break
                         
         if len(tracks) > 0:
@@ -452,7 +452,7 @@ async def get_recommendations(seed: str, target_year: int = None, title: str = "
                 
                 prompt = f"""You are SonicView's Music Recommendation Engine.
 
-Your task is to recommend exactly 20 songs based on the user's selected song.
+Your task is to recommend up to 20 songs based on the user's selected song and the TARGET CONTEXT.
 
 The goal is NOT to recommend songs that are simply from the same genre or artist.
 The goal is to find songs that would genuinely feel musically close to the selected song.
@@ -460,16 +460,19 @@ The goal is to find songs that would genuinely feel musically close to the selec
 Consider these factors in order of importance:
 
 1. Acoustic / Music DNA similarity
-2. Mood and emotional character
-3. Tempo and rhythmic characteristics
-4. Instrumentation and sonic texture
-5. Vocal characteristics
-6. Genre and subgenre
-7. Production style
-8. Release-era similarity
-9. Current relevance and popularity
+2. Target Context Match (STRICT LANGUAGE/REGION FILTERING)
+3. Mood and emotional character
+4. Tempo and rhythmic characteristics
+5. Instrumentation and sonic texture
+6. Vocal characteristics
+7. Genre and subgenre
+8. Production style
+9. Release-era similarity
+10. Current relevance and popularity
 
 The selected song is the primary reference.
+
+CRITICAL RULE: The TARGET CONTEXT specifies the intended language, region, or vibe (e.g. "Bengali songs"). You MUST strictly filter the candidate songs to match this language/region. If the target context specifies a language, completely REJECT any songs from other languages (like Hindi or English), even if they appear in the candidate list and have high acoustic similarity.
 
 Prefer music from approximately ±5 years of the selected song's release year,
 but you may go outside this range when a song has significantly stronger
@@ -479,6 +482,7 @@ Favor songs that are relevant to today's music landscape, but DO NOT recommend
 a song merely because it is currently popular.
 
 Avoid:
+- Songs from the WRONG LANGUAGE or region
 - Generic genre matches
 - Artist-only matches
 - Songs that are famous but musically unrelated
@@ -486,7 +490,7 @@ Avoid:
 - Excessively obvious recommendations
 - Songs with weak similarity just to fill the list
 
-Create exactly 20 recommendations and rank them from highest to lowest
+Create up to 20 recommendations (aim for 20, but fewer is okay if you must reject songs to satisfy the TARGET CONTEXT language rule) and rank them from highest to lowest
 musical relevance. CHOOSE ONLY FROM THE CANDIDATE SONGS LISTED BELOW.
 
 For each song provide:
@@ -510,6 +514,9 @@ SELECTED SONG:
 Title: {title}
 Artist: {artist}
 Release Year: {target_year or 'Unknown'}
+
+TARGET CONTEXT:
+{seed}
 
 MUSIC DNA:
 {dna}
