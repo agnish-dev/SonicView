@@ -922,15 +922,20 @@ function App() {
       
       {/* Full Player Modal */}
       {showFullPlayer && currentPlayingTrack && (
-        <div className="full-player-modal" style={{
-          backgroundImage: `linear-gradient(to bottom, hsla(0, 0%, 0%, 0.5), hsla(0, 0%, 0%, 0.9)), url(${getHighResArt(currentPlayingTrack.art)})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-        }}>
-          <button className="full-player-close" onClick={() => setShowFullPlayer(false)}>
+        <div className="full-player-modal" style={{ backgroundColor: '#000' }}>
+          <div className="canvas-video-container">
+            <iframe
+              className="canvas-iframe"
+              src={`https://www.youtube.com/embed/${currentPlayingTrack.id}?autoplay=1&mute=1&controls=0&showinfo=0&rel=0&loop=1&playlist=${currentPlayingTrack.id}&playsinline=1`}
+              allow="autoplay; encrypted-media"
+            />
+          </div>
+          <div className="canvas-overlay"></div>
+          
+          <button className="full-player-close" onClick={() => setShowFullPlayer(false)} style={{ zIndex: 10 }}>
             <X size={28} />
           </button>
-          <div className="full-player-content">
+          <div className="full-player-content" style={{ zIndex: 10, position: 'relative' }}>
              <div className="full-player-left">
                 <div className={`full-player-art-wrapper ${isPlaying ? 'rotating' : 'paused'}`}>
                   <img src={getHighResArt(currentPlayingTrack.art)} alt={currentPlayingTrack.title} className="full-player-art-image" />
