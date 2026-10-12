@@ -392,7 +392,6 @@ function App() {
   const audioRef = useRef(null);
   const blobUrlRef = useRef(null);
   const [streamUrl, setStreamUrl] = useState(null);
-  const [canvasVideoId, setCanvasVideoId] = useState(null);
   const [isLoadingStream, setIsLoadingStream] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -421,7 +420,6 @@ function App() {
     const fetchFullAudio = async () => {
       setIsLoadingStream(true);
       setStreamUrl(null);
-      setCanvasVideoId(null);
       try {
         const res = await customFetch(`${API_BASE}/api/stream?video_id=${currentPlayingTrack.id}&title=${encodeURIComponent(currentPlayingTrack.title)}&artist=${encodeURIComponent(currentPlayingTrack.artist)}&quality=${audioQuality}&_t=${Date.now()}`);
         if (!res.ok) throw new Error("Stream fetch failed");
@@ -448,22 +446,8 @@ function App() {
         if (active) setIsLoadingStream(false);
       }
     };
-    const fetchCanvas = async () => {
-      try {
-        const cRes = await customFetch(`${API_BASE}/api/canvas?title=${encodeURIComponent(currentPlayingTrack.title)}&artist=${encodeURIComponent(currentPlayingTrack.artist)}`);
-        if (cRes.ok && active) {
-          const cData = await cRes.json();
-          if (cData.video_id) {
-            setCanvasVideoId(cData.video_id);
-          }
-        }
-      } catch (err) {
-        console.error("Canvas fetch error:", err);
-      }
-    };
 
     fetchFullAudio();
-    fetchCanvas();
     return () => { active = false; };
   }, [currentPlayingTrack, audioQuality]);
 
@@ -941,15 +925,6 @@ function App() {
       {showFullPlayer && currentPlayingTrack && (
         <div className="full-player-modal" style={{ backgroundColor: '#000' }}>
           <div className="canvas-video-container">
-            {canvasVideoId && (
-              <iframe
-                className="canvas-iframe"
-                src={`https://www.youtube-nocookie.com/embed/${canvasVideoId}?autoplay=1&mute=1&controls=0&showinfo=0&rel=0&loop=1&playlist=${canvasVideoId}&playsinline=1&modestbranding=1&iv_load_policy=3&disablekb=1&fs=0`}
-                allow="autoplay; encrypted-media"
-                title="Canvas Background"
-              />
-            )}
-
             {/* Apple Music Fluid Liquid Glow Canvas */}
             <div className="apple-music-fluid-canvas">
               <div className="fluid-blob fluid-blob-1" style={{ backgroundImage: `url(${getHighResArt(currentPlayingTrack.art)})` }}></div>
