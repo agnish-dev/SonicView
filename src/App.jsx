@@ -391,7 +391,6 @@ function App() {
   // Audio State
   const audioRef = useRef(null);
   const blobUrlRef = useRef(null);
-  const canvasIframeRef = useRef(null);
   const [streamUrl, setStreamUrl] = useState(null);
   const [canvasVideoId, setCanvasVideoId] = useState(null);
   const [isLoadingStream, setIsLoadingStream] = useState(false);
@@ -534,40 +533,6 @@ function App() {
     fetchLyricsData();
     return () => { active = false; };
   }, [currentPlayingTrack]);
-
-  // Spotify Canvas 6-second Loop Controller
-  useEffect(() => {
-    if (!showFullPlayer || !canvasVideoId) return;
-
-    const LOOP_DURATION_MS = 6000; // 6 seconds loop
-    const START_SECOND = 30; // Start trim at 30s for 6 seconds (30s to 36s)
-
-    const interval = setInterval(() => {
-      try {
-        if (canvasIframeRef.current && canvasIframeRef.current.contentWindow) {
-          canvasIframeRef.current.contentWindow.postMessage(
-            JSON.stringify({
-              event: 'command',
-              func: 'seekTo',
-              args: [START_SECOND, true]
-            }),
-            '*'
-          );
-          canvasIframeRef.current.contentWindow.postMessage(
-            JSON.stringify({
-              event: 'command',
-              func: 'playVideo'
-            }),
-            '*'
-          );
-        }
-      } catch (e) {
-        // Ignore cross-origin warnings
-      }
-    }, LOOP_DURATION_MS);
-
-    return () => clearInterval(interval);
-  }, [showFullPlayer, canvasVideoId]);
   
   const refreshGlobal = async () => {
     if (!analysisResult) return;
@@ -976,22 +941,21 @@ function App() {
       {showFullPlayer && currentPlayingTrack && (
         <div className="full-player-modal" style={{ backgroundColor: '#000' }}>
           <div className="canvas-video-container">
-            {canvasVideoId ? (
+            {canvasVideoId && (
               <iframe
-                ref={canvasIframeRef}
                 className="canvas-iframe"
-                src={`https://www.youtube-nocookie.com/embed/${canvasVideoId}?autoplay=1&mute=1&controls=0&showinfo=0&rel=0&loop=1&playlist=${canvasVideoId}&playsinline=1&modestbranding=1&iv_load_policy=3&disablekb=1&fs=0&start=30&enablejsapi=1`}
+                src={`https://www.youtube-nocookie.com/embed/${canvasVideoId}?autoplay=1&mute=1&controls=0&showinfo=0&rel=0&loop=1&playlist=${canvasVideoId}&playsinline=1&modestbranding=1&iv_load_policy=3&disablekb=1&fs=0`}
                 allow="autoplay; encrypted-media"
                 title="Canvas Background"
               />
-            ) : (
-              <img 
-                className="canvas-iframe"
-                src={getHighResArt(currentPlayingTrack.art)}
-                alt="Background Canvas"
-                style={{ opacity: 0.5, filter: 'blur(20px) brightness(0.6)' }}
-              />
             )}
+
+            {/* Apple Music Fluid Liquid Glow Canvas */}
+            <div className="apple-music-fluid-canvas">
+              <div className="fluid-blob fluid-blob-1" style={{ backgroundImage: `url(${getHighResArt(currentPlayingTrack.art)})` }}></div>
+              <div className="fluid-blob fluid-blob-2" style={{ backgroundImage: `url(${getHighResArt(currentPlayingTrack.art)})` }}></div>
+              <div className="fluid-blob fluid-blob-3" style={{ backgroundImage: `url(${getHighResArt(currentPlayingTrack.art)})` }}></div>
+            </div>
           </div>
           <div className="canvas-overlay"></div>
           
