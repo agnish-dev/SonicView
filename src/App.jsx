@@ -392,7 +392,7 @@ function App() {
   const audioRef = useRef(null);
   const blobUrlRef = useRef(null);
   const [streamUrl, setStreamUrl] = useState(null);
-  const [videoUrl, setVideoUrl] = useState(null);
+  const [canvasVideoId, setCanvasVideoId] = useState(null);
   const [isLoadingStream, setIsLoadingStream] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -421,13 +421,12 @@ function App() {
     const fetchFullAudio = async () => {
       setIsLoadingStream(true);
       setStreamUrl(null);
-      setVideoUrl(null);
+      setCanvasVideoId(null);
       try {
         const res = await customFetch(`${API_BASE}/api/stream?video_id=${currentPlayingTrack.id}&title=${encodeURIComponent(currentPlayingTrack.title)}&artist=${encodeURIComponent(currentPlayingTrack.artist)}&quality=${audioQuality}&_t=${Date.now()}`);
         if (!res.ok) throw new Error("Stream fetch failed");
         const data = await res.json();
         if (active) {
-          if (data.video_url) setVideoUrl(data.video_url);
           const finalUrl = data.stream_url.startsWith('/api/') ? API_BASE + data.stream_url : data.stream_url;
           
           if (finalUrl.includes('ngrok-free.dev')) {
@@ -454,8 +453,8 @@ function App() {
         const cRes = await customFetch(`${API_BASE}/api/canvas?title=${encodeURIComponent(currentPlayingTrack.title)}&artist=${encodeURIComponent(currentPlayingTrack.artist)}`);
         if (cRes.ok && active) {
           const cData = await cRes.json();
-          if (cData.video_url) {
-            setVideoUrl(cData.video_url);
+          if (cData.video_id) {
+            setCanvasVideoId(cData.video_id);
           }
         }
       } catch (err) {
@@ -942,22 +941,19 @@ function App() {
       {showFullPlayer && currentPlayingTrack && (
         <div className="full-player-modal" style={{ backgroundColor: '#000' }}>
           <div className="canvas-video-container">
-            {videoUrl ? (
-              <video 
-                className="canvas-iframe" 
-                src={videoUrl} 
-                autoPlay 
-                loop 
-                muted 
-                playsInline 
-                onError={() => setVideoUrl(null)}
+            {canvasVideoId ? (
+              <iframe
+                className="canvas-iframe"
+                src={`https://www.youtube-nocookie.com/embed/${canvasVideoId}?autoplay=1&mute=1&controls=0&showinfo=0&rel=0&loop=1&playlist=${canvasVideoId}&playsinline=1&modestbranding=1&iv_load_policy=3&disablekb=1&fs=0`}
+                allow="autoplay; encrypted-media"
+                title="Canvas Background"
               />
             ) : (
               <img 
                 className="canvas-iframe"
                 src={getHighResArt(currentPlayingTrack.art)}
                 alt="Background Canvas"
-                style={{ objectFit: 'cover', width: '100vw', height: '100vh', opacity: 0.5, filter: 'blur(20px) brightness(0.6)' }}
+                style={{ opacity: 0.5, filter: 'blur(20px) brightness(0.6)' }}
               />
             )}
           </div>

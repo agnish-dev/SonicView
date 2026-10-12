@@ -356,7 +356,7 @@ async def get_canvas(title: str, artist: str = ""):
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
-            'format': 'bestvideo[height<=480][ext=mp4]/bestvideo[height<=480]/best[height<=480]'
+            'extract_flat': True
         }
         if os.path.exists('cookies.txt'):
             ydl_opts['cookiefile'] = 'cookies.txt'
@@ -366,14 +366,14 @@ async def get_canvas(title: str, artist: str = ""):
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 res = ydl.extract_info(query, download=False)
                 if 'entries' in res and res['entries']:
-                    return res['entries'][0].get('url')
-                return res.get('url')
+                    return res['entries'][0].get('id')
+                return res.get('id')
 
-        video_url = await loop.run_in_executor(None, extract)
-        return {"video_url": video_url or ""}
+        video_id = await loop.run_in_executor(None, extract)
+        return {"video_id": video_id or ""}
     except Exception as e:
         print(f"Canvas extraction error: {e}")
-        return {"video_url": ""}
+        return {"video_id": ""}
 
 import re
 
