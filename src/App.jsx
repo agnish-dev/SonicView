@@ -952,7 +952,7 @@ function App() {
                   canvasVideoRef.current = el;
                   if (el) {
                     el.muted = true;
-                    if (isPlaying) el.play().catch(() => {});
+                    el.play().catch(() => {});
                   }
                 }}
                 className="canvas-iframe"
@@ -960,16 +960,23 @@ function App() {
                 autoPlay
                 muted
                 playsInline
+                loop
                 onLoadedMetadata={(e) => {
                   const vid = e.target;
                   vid.muted = true;
                   const start = vid.duration > 35 ? 30 : 0;
                   vid.currentTime = start;
-                  if (isPlaying) vid.play().catch(() => {});
+                  vid.play().catch(() => {});
+                }}
+                onSeeked={(e) => {
+                  const vid = e.target;
+                  vid.muted = true;
+                  vid.play().catch(() => {});
                 }}
                 onCanPlay={(e) => {
-                  e.target.muted = true;
-                  if (isPlaying) e.target.play().catch(() => {});
+                  const vid = e.target;
+                  vid.muted = true;
+                  vid.play().catch(() => {});
                 }}
                 onTimeUpdate={(e) => {
                   const vid = e.target;
@@ -985,7 +992,7 @@ function App() {
                   vid.muted = true;
                   const start = vid.duration > 35 ? 30 : 0;
                   vid.currentTime = start;
-                  if (isPlaying) vid.play().catch(() => {});
+                  vid.play().catch(() => {});
                 }}
                 onError={() => setCanvasVideoUrl(null)}
                 style={{ objectFit: 'cover', pointerEvents: 'none', border: 'none' }}
