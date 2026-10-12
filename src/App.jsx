@@ -540,7 +540,7 @@ function App() {
     if (!showFullPlayer || !canvasVideoId) return;
 
     const LOOP_DURATION_MS = 6000; // 6 seconds loop
-    const START_SECOND = 35; // Start at 35s into the video
+    const START_SECOND = 30; // Start trim at 30s for 6 seconds (30s to 36s)
 
     const interval = setInterval(() => {
       try {
@@ -973,7 +973,7 @@ function App() {
               <iframe
                 ref={canvasIframeRef}
                 className="canvas-iframe"
-                src={`https://www.youtube-nocookie.com/embed/${canvasVideoId}?autoplay=1&mute=1&controls=0&showinfo=0&rel=0&loop=1&playlist=${canvasVideoId}&playsinline=1&modestbranding=1&iv_load_policy=3&disablekb=1&fs=0&start=35&end=41&enablejsapi=1`}
+                src={`https://www.youtube-nocookie.com/embed/${canvasVideoId}?autoplay=1&mute=1&controls=0&showinfo=0&rel=0&loop=1&playlist=${canvasVideoId}&playsinline=1&modestbranding=1&iv_load_policy=3&disablekb=1&fs=0&start=30&end=36&enablejsapi=1`}
                 allow="autoplay; encrypted-media"
                 title="Canvas Background"
               />
