@@ -1409,7 +1409,7 @@ function App() {
                 <div style={{ minWidth: 0 }}>
                   <h2 className="section-title" style={{ color: 'var(--success-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      <Music size={24} color="var(--success-color)"/> {analysisResult?.language || selectedTrack.genre} Recommendations
+                      <Music size={24} color="var(--success-color)"/> Local Recommendations
                     </div>
                     <button onClick={refreshGenre} disabled={isRefreshingGenre} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
                       <RefreshCw size={28} style={{ animation: isRefreshingGenre ? 'spin 1s linear infinite' : 'none' }} />
