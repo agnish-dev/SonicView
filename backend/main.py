@@ -24,6 +24,7 @@ import urllib.parse
 import json
 
 load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 # Securely load YouTube cookies from base64 environment variable (for Render deployment)
 youtube_cookies_b64 = os.getenv("YOUTUBE_COOKIES_BASE64")
@@ -344,6 +345,35 @@ async def get_stream(video_id: str, title: Optional[str] = None, artist: Optiona
         return {"stream_url": stream_url, "video_url": video_url, "skip_segments": skip_segments}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/canvas")
+async def get_canvas(title: str, artist: str = ""):
+    try:
+        import re
+        clean_title = re.sub(r'\(.*?\)|\[.*?\]', '', title).strip()
+        query = f"ytsearch1:{clean_title} {artist} official video".strip()
+        
+        ydl_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'format': 'bestvideo[height<=480][ext=mp4]/bestvideo[height<=480]/best[height<=480]'
+        }
+        if os.path.exists('cookies.txt'):
+            ydl_opts['cookiefile'] = 'cookies.txt'
+
+        loop = asyncio.get_event_loop()
+        def extract():
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                res = ydl.extract_info(query, download=False)
+                if 'entries' in res and res['entries']:
+                    return res['entries'][0].get('url')
+                return res.get('url')
+
+        video_url = await loop.run_in_executor(None, extract)
+        return {"video_url": video_url or ""}
+    except Exception as e:
+        print(f"Canvas extraction error: {e}")
+        return {"video_url": ""}
 
 import re
 

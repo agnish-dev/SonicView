@@ -449,7 +449,22 @@ function App() {
         if (active) setIsLoadingStream(false);
       }
     };
+    const fetchCanvas = async () => {
+      try {
+        const cRes = await customFetch(`${API_BASE}/api/canvas?title=${encodeURIComponent(currentPlayingTrack.title)}&artist=${encodeURIComponent(currentPlayingTrack.artist)}`);
+        if (cRes.ok && active) {
+          const cData = await cRes.json();
+          if (cData.video_url) {
+            setVideoUrl(cData.video_url);
+          }
+        }
+      } catch (err) {
+        console.error("Canvas fetch error:", err);
+      }
+    };
+
     fetchFullAudio();
+    fetchCanvas();
     return () => { active = false; };
   }, [currentPlayingTrack, audioQuality]);
 
@@ -935,6 +950,7 @@ function App() {
                 loop 
                 muted 
                 playsInline 
+                onError={() => setVideoUrl(null)}
               />
             ) : (
               <img 
