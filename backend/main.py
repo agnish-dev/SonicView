@@ -456,10 +456,14 @@ async def get_stream(video_id: str, title: Optional[str] = None, artist: Optiona
                         v_formats.sort(key=lambda x: x.get('height', 0), reverse=True)
                         video_url = v_formats[0].get('url')
                     else:
-                        # Fallback to any mp4 with video
-                        any_v = [f for f in info['formats'] if f.get('vcodec') != 'none' and f.get('ext') == 'mp4']
-                        if any_v:
-                            video_url = any_v[0].get('url')
+                        v_formats_any = [f for f in info['formats'] if f.get('vcodec') != 'none' and f.get('height', 0) and f.get('height', 0) <= 480]
+                        if v_formats_any:
+                            v_formats_any.sort(key=lambda x: x.get('height', 0), reverse=True)
+                            video_url = v_formats_any[0].get('url')
+                        else:
+                            any_v = [f for f in info['formats'] if f.get('vcodec') != 'none']
+                            if any_v:
+                                video_url = any_v[0].get('url')
                             
         except Exception as e:
             print(f"yt-dlp failed: {e}")

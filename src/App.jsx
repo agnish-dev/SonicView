@@ -391,9 +391,9 @@ function App() {
   // Audio State
   const audioRef = useRef(null);
   const blobUrlRef = useRef(null);
-  const canvasIframeRef = useRef(null);
+  const canvasVideoRef = useRef(null);
   const [streamUrl, setStreamUrl] = useState(null);
-  const [canvasVideoId, setCanvasVideoId] = useState(null);
+  const [canvasVideoUrl, setCanvasVideoUrl] = useState(null);
   const [isLoadingStream, setIsLoadingStream] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -408,6 +408,7 @@ function App() {
   useEffect(() => {
     if (!currentPlayingTrack) {
       setStreamUrl(null);
+      setCanvasVideoUrl(null);
       setSkipSegments([]);
       setIsPlaying(false);
       setCurrentTime(0);
@@ -422,7 +423,7 @@ function App() {
     const fetchFullAudio = async () => {
       setIsLoadingStream(true);
       setStreamUrl(null);
-      setCanvasVideoId(null);
+      setCanvasVideoUrl(null);
       try {
         const res = await customFetch(`${API_BASE}/api/stream?video_id=${currentPlayingTrack.id}&title=${encodeURIComponent(currentPlayingTrack.title)}&artist=${encodeURIComponent(currentPlayingTrack.artist)}&quality=${audioQuality}&_t=${Date.now()}`);
         if (!res.ok) throw new Error("Stream fetch failed");
@@ -441,6 +442,10 @@ function App() {
             setStreamUrl(finalUrl);
           }
           
+          if (data.video_url) {
+            setCanvasVideoUrl(data.video_url);
+          }
+          
           setSkipSegments(data.skip_segments || []);
         }
       } catch (err) {
@@ -449,22 +454,8 @@ function App() {
         if (active) setIsLoadingStream(false);
       }
     };
-    const fetchCanvas = async () => {
-      try {
-        const cRes = await customFetch(`${API_BASE}/api/canvas?title=${encodeURIComponent(currentPlayingTrack.title)}&artist=${encodeURIComponent(currentPlayingTrack.artist)}`);
-        if (cRes.ok && active) {
-          const cData = await cRes.json();
-          if (cData.video_id) {
-            setCanvasVideoId(cData.video_id);
-          }
-        }
-      } catch (err) {
-        console.error("Canvas fetch error:", err);
-      }
-    };
 
     fetchFullAudio();
-    fetchCanvas();
     return () => { active = false; };
   }, [currentPlayingTrack, audioQuality]);
 
@@ -535,39 +526,16 @@ function App() {
     return () => { active = false; };
   }, [currentPlayingTrack]);
 
-  // Canvas 30-second Loop Controller (start at 30s, loop every 30s)
+  // Synchronize native video canvas playback with audio play/pause
   useEffect(() => {
-    if (!showFullPlayer || !canvasVideoId) return;
-
-    const LOOP_DURATION_MS = 30000; // 30 seconds loop
-    const START_SECOND = 30; // Start at 30s
-
-    const interval = setInterval(() => {
-      try {
-        if (canvasIframeRef.current && canvasIframeRef.current.contentWindow) {
-          canvasIframeRef.current.contentWindow.postMessage(
-            JSON.stringify({
-              event: 'command',
-              func: 'seekTo',
-              args: [START_SECOND, true]
-            }),
-            '*'
-          );
-          canvasIframeRef.current.contentWindow.postMessage(
-            JSON.stringify({
-              event: 'command',
-              func: 'playVideo'
-            }),
-            '*'
-          );
-        }
-      } catch (e) {
-        // Ignore cross-origin warnings
+    if (canvasVideoRef.current) {
+      if (isPlaying) {
+        canvasVideoRef.current.play().catch(() => {});
+      } else {
+        canvasVideoRef.current.pause();
       }
-    }, LOOP_DURATION_MS);
-
-    return () => clearInterval(interval);
-  }, [showFullPlayer, canvasVideoId]);
+    }
+  }, [isPlaying]);
   
   const refreshGlobal = async () => {
     if (!analysisResult) return;
@@ -976,13 +944,35 @@ function App() {
       {showFullPlayer && currentPlayingTrack && (
         <div className="full-player-modal" style={{ backgroundColor: '#000' }}>
           <div className="canvas-video-container">
-            {canvasVideoId && (
-              <iframe
-                ref={canvasIframeRef}
+            {canvasVideoUrl && (
+              <video
+                key={canvasVideoUrl}
+                ref={canvasVideoRef}
                 className="canvas-iframe"
-                src={`https://www.youtube-nocookie.com/embed/${canvasVideoId}?autoplay=1&mute=1&controls=0&showinfo=0&rel=0&loop=1&playlist=${canvasVideoId}&playsinline=1&modestbranding=1&iv_load_policy=3&disablekb=1&fs=0&start=30&enablejsapi=1`}
-                allow="autoplay; encrypted-media"
-                title="Canvas Background"
+                src={canvasVideoUrl}
+                autoPlay
+                muted
+                playsInline
+                loop
+                onLoadedMetadata={(e) => {
+                  const vid = e.target;
+                  if (vid.duration > 35) {
+                    vid.currentTime = 30;
+                  } else {
+                    vid.currentTime = 0;
+                  }
+                }}
+                onTimeUpdate={(e) => {
+                  const vid = e.target;
+                  if (!vid.duration) return;
+                  const start = vid.duration > 35 ? 30 : 0;
+                  const end = vid.duration > 35 ? Math.min(60, vid.duration) : vid.duration;
+                  if (vid.currentTime >= end || vid.currentTime < start) {
+                    vid.currentTime = start;
+                  }
+                }}
+                onError={() => setCanvasVideoUrl(null)}
+                style={{ objectFit: 'cover', pointerEvents: 'none', border: 'none' }}
               />
             )}
 

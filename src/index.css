@@ -1482,6 +1482,7 @@ header p {
   z-index: 1;
 }
 
+video.canvas-iframe,
 img.canvas-iframe {
   top: 0;
   left: 0;
@@ -1489,6 +1490,7 @@ img.canvas-iframe {
   height: 100%;
   transform: none;
   object-fit: cover;
+  pointer-events: none;
 }
 
 @media (min-aspect-ratio: 16/9) {
