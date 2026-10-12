@@ -391,6 +391,7 @@ function App() {
   // Audio State
   const audioRef = useRef(null);
   const blobUrlRef = useRef(null);
+  const canvasIframeRef = useRef(null);
   const [streamUrl, setStreamUrl] = useState(null);
   const [canvasVideoId, setCanvasVideoId] = useState(null);
   const [isLoadingStream, setIsLoadingStream] = useState(false);
@@ -533,6 +534,33 @@ function App() {
     fetchLyricsData();
     return () => { active = false; };
   }, [currentPlayingTrack]);
+
+  // Spotify Canvas 6-second Loop Controller
+  useEffect(() => {
+    if (!showFullPlayer || !canvasVideoId) return;
+
+    const LOOP_DURATION_MS = 6000; // 6 seconds loop
+    const START_SECOND = 35; // Start at 35s into the video
+
+    const interval = setInterval(() => {
+      try {
+        if (canvasIframeRef.current && canvasIframeRef.current.contentWindow) {
+          canvasIframeRef.current.contentWindow.postMessage(
+            JSON.stringify({
+              event: 'command',
+              func: 'seekTo',
+              args: [START_SECOND, true]
+            }),
+            '*'
+          );
+        }
+      } catch (e) {
+        // Ignore cross-origin warnings
+      }
+    }, LOOP_DURATION_MS);
+
+    return () => clearInterval(interval);
+  }, [showFullPlayer, canvasVideoId]);
   
   const refreshGlobal = async () => {
     if (!analysisResult) return;
@@ -943,8 +971,9 @@ function App() {
           <div className="canvas-video-container">
             {canvasVideoId ? (
               <iframe
+                ref={canvasIframeRef}
                 className="canvas-iframe"
-                src={`https://www.youtube-nocookie.com/embed/${canvasVideoId}?autoplay=1&mute=1&controls=0&showinfo=0&rel=0&loop=1&playlist=${canvasVideoId}&playsinline=1&modestbranding=1&iv_load_policy=3&disablekb=1&fs=0`}
+                src={`https://www.youtube-nocookie.com/embed/${canvasVideoId}?autoplay=1&mute=1&controls=0&showinfo=0&rel=0&loop=1&playlist=${canvasVideoId}&playsinline=1&modestbranding=1&iv_load_policy=3&disablekb=1&fs=0&start=35&end=41&enablejsapi=1`}
                 allow="autoplay; encrypted-media"
                 title="Canvas Background"
               />
