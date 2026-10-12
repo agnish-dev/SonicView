@@ -529,13 +529,14 @@ function App() {
   // Synchronize native video canvas playback with audio play/pause
   useEffect(() => {
     if (canvasVideoRef.current) {
+      canvasVideoRef.current.muted = true;
       if (isPlaying) {
         canvasVideoRef.current.play().catch(() => {});
       } else {
         canvasVideoRef.current.pause();
       }
     }
-  }, [isPlaying]);
+  }, [isPlaying, showFullPlayer, canvasVideoUrl]);
   
   const refreshGlobal = async () => {
     if (!analysisResult) return;
@@ -947,29 +948,44 @@ function App() {
             {canvasVideoUrl && (
               <video
                 key={canvasVideoUrl}
-                ref={canvasVideoRef}
+                ref={(el) => {
+                  canvasVideoRef.current = el;
+                  if (el) {
+                    el.muted = true;
+                    if (isPlaying) el.play().catch(() => {});
+                  }
+                }}
                 className="canvas-iframe"
                 src={canvasVideoUrl}
                 autoPlay
                 muted
                 playsInline
-                loop
                 onLoadedMetadata={(e) => {
                   const vid = e.target;
-                  if (vid.duration > 35) {
-                    vid.currentTime = 30;
-                  } else {
-                    vid.currentTime = 0;
-                  }
+                  vid.muted = true;
+                  const start = vid.duration > 35 ? 30 : 0;
+                  vid.currentTime = start;
+                  if (isPlaying) vid.play().catch(() => {});
+                }}
+                onCanPlay={(e) => {
+                  e.target.muted = true;
+                  if (isPlaying) e.target.play().catch(() => {});
                 }}
                 onTimeUpdate={(e) => {
                   const vid = e.target;
-                  if (!vid.duration) return;
+                  if (!vid.duration || vid.seeking) return;
                   const start = vid.duration > 35 ? 30 : 0;
                   const end = vid.duration > 35 ? Math.min(60, vid.duration) : vid.duration;
-                  if (vid.currentTime >= end || vid.currentTime < start) {
+                  if (vid.currentTime >= end) {
                     vid.currentTime = start;
                   }
+                }}
+                onEnded={(e) => {
+                  const vid = e.target;
+                  vid.muted = true;
+                  const start = vid.duration > 35 ? 30 : 0;
+                  vid.currentTime = start;
+                  if (isPlaying) vid.play().catch(() => {});
                 }}
                 onError={() => setCanvasVideoUrl(null)}
                 style={{ objectFit: 'cover', pointerEvents: 'none', border: 'none' }}
