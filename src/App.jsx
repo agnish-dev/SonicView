@@ -955,7 +955,7 @@ function App() {
       </div>
 
       {/* Global Player */}
-      {currentPlayingTrack && (
+      {currentPlayingTrack && !showFullPlayer && (
         <GlobalPlayer 
           track={currentPlayingTrack} 
           streamUrl={streamUrl}
