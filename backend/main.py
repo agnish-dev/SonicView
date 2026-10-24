@@ -276,26 +276,120 @@ async def get_piped_stream(video_id: str) -> str:
                 
     return ""
 
+import math
+
+JUNK_KEYWORDS = [
+    "slowed", "reverb", "8d audio", "bass boosted", "karaoke", 
+    "instrumental", "reaction", "remake", "parody", "ringtone", 
+    "nightcore", "sped up", "status"
+]
+
+def parse_views(v) -> int:
+    """Converts '2.8B', '968M', '450K views' to an integer."""
+    if not v:
+        return 0
+    clean = str(v).lower().replace("views", "").replace(",", "").strip()
+    try:
+        if "b" in clean:
+            return int(float(clean.replace("b", "")) * 1_000_000_000)
+        if "m" in clean:
+            return int(float(clean.replace("m", "")) * 1_000_000)
+        if "k" in clean:
+            return int(float(clean.replace("k", "")) * 1_000)
+        return int(clean)
+    except Exception:
+        return 0
+
+def rank_track(item: dict, query: str) -> float:
+    """Ranks tracks live based on popularity, official release status, and relevance."""
+    score = 0.0
+    title = (item.get("title") or "").lower()
+    q_lower = query.lower().strip()
+
+    # 1. YouTube Music's curated Top Result gets highest priority
+    if item.get("category") == "Top result":
+        score += 85.0
+
+    # 2. Official release status bonus
+    vtype = item.get("videoType", "")
+    if vtype in ["MUSIC_VIDEO_TYPE_OMV", "MUSIC_VIDEO_TYPE_ATV"]:
+        score += 45.0
+    elif vtype == "MUSIC_VIDEO_TYPE_UGC":
+        score -= 25.0
+
+    if item.get("resultType") == "song":
+        score += 30.0
+    if item.get("album"):
+        score += 15.0
+
+    # 3. Penalize junk/fan edits unless explicitly searched for
+    for junk in JUNK_KEYWORDS:
+        if junk in title and junk not in q_lower:
+            score -= 100.0
+
+    # 4. Title match accuracy
+    if title == q_lower:
+        score += 50.0
+    elif q_lower in title:
+        score += 25.0
+
+    # 5. Popularity bonus (logarithmic view count scaling)
+    views = parse_views(item.get("views"))
+    if views > 0:
+        score += min(math.log10(views) * 5.0, 50.0)
+
+    # 6. Recency bonus if year is available
+    year_val = item.get("year")
+    if year_val:
+        try:
+            import re
+            m = re.search(r'\d{4}', str(year_val))
+            if m:
+                year_int = int(m.group())
+                import datetime
+                diff = datetime.datetime.now().year - year_int
+                if diff <= 0:
+                    score += 25.0
+                elif diff == 1:
+                    score += 18.0
+                elif diff <= 3:
+                    score += 10.0
+        except Exception:
+            pass
+
+    return score
+
 @app.get("/api/search")
 async def search(q: str):
     try:
-        # Search for both songs and videos explicitly to get comprehensive results (e.g. Coke Studio)
-        songs = ytmusic.search(q, filter="songs")
-        videos = ytmusic.search(q, filter="videos")
+        loop = asyncio.get_event_loop()
+        # Fetch both top general results and song catalog concurrently for speed and breadth
+        gen_task = loop.run_in_executor(None, lambda: ytmusic.search(q))
+        songs_task = loop.run_in_executor(None, lambda: ytmusic.search(q, filter="songs"))
         
-        raw_results = songs + videos
+        gen_res, songs_res = await asyncio.gather(gen_task, songs_task, return_exceptions=True)
         
+        raw_items = []
+        if isinstance(gen_res, list):
+            raw_items.extend(gen_res)
+        if isinstance(songs_res, list):
+            raw_items.extend(songs_res)
+
         seen = set()
-        results = []
-        for item in raw_results:
+        unique_results = []
+        for item in raw_items:
             vid = item.get("videoId")
             if vid and vid not in seen:
                 seen.add(vid)
-                results.append(item)
-                
-        return [format_track(item) for item in results]
+                unique_results.append(item)
+
+        # Sort on-the-fly: famous, recent & official tracks bubble up to the top
+        unique_results.sort(key=lambda x: rank_track(x, q), reverse=True)
+
+        return [format_track(item) for item in unique_results]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/api/regional-top")
 async def regional_top(language: str):
