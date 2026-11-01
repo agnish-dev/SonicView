@@ -391,60 +391,64 @@ async def search(q: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# Official YouTube Music Weekly / Daily Chart Playlist IDs (matching BitChord's catalog structure)
+YTMUSIC_OFFICIAL_CHARTS = {
+    'trending': 'OLAK5uy_lSTp1DIuzZBUyee3kDsXwPgP25WdfwB40',  # Trending 20 India
+    'india': 'OLAK5uy_lSTp1DIuzZBUyee3kDsXwPgP25WdfwB40',
+    'hindi': 'PL4fGSI1pDJn5RgLW0Sb_zECecWdH_4zOX',           # Top Weekly Videos Hindi
+    'punjabi': 'PL4fGSI1pDJn5JXkyIohg2RstsbL2SnRew',         # Top Weekly Videos Punjabi
+    'tamil': 'PL4fGSI1pDJn4WX22qg1Po7qKOwOb4H6Sk',           # Top Weekly Videos Tamil
+    'telugu': 'PL4fGSI1pDJn5ALuqpEj_YZ8mEyw9WN8jd',          # Top Weekly Videos Telugu
+    'bhojpuri': 'PL4fGSI1pDJn4ivDqrsepD3tvHsp0KTDRM',        # Top Weekly Videos Bhojpuri
+    'haryanvi': 'PL4fGSI1pDJn4tiNLMZVGGt2Kghgw__2u0',        # Top Weekly Videos Haryanvi
+    'english': 'PL4fGSI1pDJn49TUu37nJoN2QTeYuRwmNv',         # Top Weekly Videos International
+    'global': 'PL4fGSI1pDJn49TUu37nJoN2QTeYuRwmNv',
+}
+
 @app.get("/api/regional-top")
 async def regional_top(language: str):
     try:
-        # Map languages to official JioSaavn Trending/Top 50 Playlist IDs
-        chart_ids = {
-            'hindi': '49', # Hindi Top 50
-            'tamil': '1134651042', # Tamil Top 50
-            'telugu': '2574962', # Telugu Top 50
-            'punjabi': '1134543511', # Punjabi Top 50
-            'malayalam': '3344648', # Malayalam Top 50
-            'kannada': '2676953', # Kannada Top 50
-            'bhojpuri': '1134768973', # Bhojpuri Top 50
-            'global': '1134595537', # English Top 50
-            '90s': '1167751266', # Hindi 1990s
-        }
-        
-        lang_key = language.lower()
-        playlist_id = chart_ids.get(lang_key, chart_ids['hindi']) # fallback to Hindi Top 50
+        lang_key = language.lower().strip()
+        loop = asyncio.get_event_loop()
 
-        url = f"https://www.jiosaavn.com/api.php?__call=playlist.getDetails&listid={playlist_id}&_format=json&_marker=0&ctx=android"
-        async with httpx.AsyncClient() as client:
-            res = await client.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10.0)
-            if res.status_code == 200:
-                data = res.json()
-                # Parse JioSaavn playlist format (keys are '0', '1', '2'...)
-                songs = [data[str(i)] for i in range(50) if str(i) in data]
-                
-                formatted_results = []
-                for song in songs:
-                    try:
-                        s = int(song.get('duration', 0))
-                        dur = f"{s//60}:{s%60:02d}"
-                    except:
-                        dur = "0:00"
-                        
-                    art = song.get('image', '').replace('150x150', '500x500')
-                    artist = song.get('singers') or song.get('primary_artists') or "Unknown Artist"
-                    title = song.get('song', 'Unknown Title')
-                    
-                    formatted_results.append({
-                        "id": "jiosaavn:" + song.get('id', ''),
-                        "title": title,
-                        "artist": artist,
-                        "duration": dur,
-                        "art": art,
-                        "genre": language,
-                        "preview_url": ""
-                    })
-                
-                import random
-                random.shuffle(formatted_results)
-                return formatted_results[:20]
-        
-        return []
+        # 1. First priority: Check official YouTube Music curated chart playlists
+        if lang_key in YTMUSIC_OFFICIAL_CHARTS:
+            playlist_id = YTMUSIC_OFFICIAL_CHARTS[lang_key]
+            try:
+                pl = await loop.run_in_executor(None, lambda: ytmusic.get_playlist(playlist_id, limit=30))
+                tracks = pl.get("tracks", [])
+                if tracks:
+                    formatted = []
+                    for t in tracks:
+                        if t.get("videoId"):
+                            track_item = format_track(t)
+                            track_item["genre"] = language
+                            formatted.append(track_item)
+                    if formatted:
+                        return formatted[:25]
+            except Exception as e:
+                print(f"Official chart fetch failed for {language}: {e}")
+
+        # 2. General/Language Search on YouTube Music Catalog
+        search_query = f"Top {language} Songs"
+        if lang_key == "90s":
+            search_query = "90s Bollywood Hits"
+        elif lang_key == "pakistani":
+            search_query = "Top Pakistani Coke Studio Songs"
+
+        raw_songs = await loop.run_in_executor(None, lambda: ytmusic.search(search_query, filter="songs"))
+
+        formatted = []
+        seen = set()
+        for item in raw_songs:
+            vid = item.get("videoId")
+            if vid and vid not in seen:
+                seen.add(vid)
+                track_item = format_track(item)
+                track_item["genre"] = language
+                formatted.append(track_item)
+
+        return formatted[:25]
     except Exception as e:
         print(f"Regional Top Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))

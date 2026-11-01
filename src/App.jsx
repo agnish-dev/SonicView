@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Music, ArrowLeft, Play, Activity, RefreshCw, Pause, SkipBack, SkipForward, Shuffle, X, Repeat, Heart, Mic2, ListMusic, Volume2, Network, ArrowRight, Zap, Triangle, Waves, Square, ActivitySquare, Hexagon, Search, Download, CheckCircle, Trash2 } from 'lucide-react';
 import Library from './Library.jsx';
+import { fetchLyricsClient } from './utils/lyrics.js';
 import { saveTrackToDB, getTrackFromDB, getAllSavedTracks, deleteTrackFromDB } from './utils/db.js';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
@@ -233,12 +234,21 @@ function GlobalPlayer({ track, streamUrl, isLoading, isPlaying, currentTime, dur
                     const oldHtml = btn.innerHTML;
                     btn.innerHTML = '⏳';
                     try {
-                        const targetStream = streamUrl.startsWith('http') && !streamUrl.includes('/api/proxy') 
-                          ? `${API_BASE}/api/proxy_stream?url=${encodeURIComponent(streamUrl)}` 
-                          : streamUrl;
-                        const res = await customFetch(targetStream);
-                        if (!res.ok) throw new Error("Stream fetch failed");
-                        const blob = await res.blob();
+                        let blob = null;
+                        try {
+                          const directRes = await fetch(streamUrl);
+                          if (directRes.ok) blob = await directRes.blob();
+                        } catch (e) {
+                          // CORS blocked direct download, fallback to proxy
+                        }
+                        if (!blob) {
+                          const targetStream = streamUrl.startsWith('http') && !streamUrl.includes('/api/proxy') 
+                            ? `${API_BASE}/api/proxy_stream?url=${encodeURIComponent(streamUrl)}` 
+                            : streamUrl;
+                          const res = await customFetch(targetStream);
+                          if (!res.ok) throw new Error("Stream fetch failed");
+                          blob = await res.blob();
+                        }
                         
                         let imgRes = await fetch(track.art).catch(() => null);
                         if (!imgRes || !imgRes.ok) {
@@ -507,14 +517,9 @@ function App() {
       setCurrentLyrics(null);
       setIsLoadingLyrics(true);
       try {
-         const res = await customFetch(`${API_BASE}/api/lyrics?video_id=${encodeURIComponent(currentPlayingTrack.id)}&title=${encodeURIComponent(currentPlayingTrack.title)}&artist=${encodeURIComponent(currentPlayingTrack.artist)}${currentPlayingTrack.duration ? `&duration=${encodeURIComponent(currentPlayingTrack.duration)}` : ''}`);
+         const lyricsData = await fetchLyricsClient(currentPlayingTrack, API_BASE, customFetch);
          if (active) {
-             if (res.ok) {
-                 const data = await res.json();
-                 setCurrentLyrics(data);
-             } else {
-                 setCurrentLyrics({ hasTimestamps: false, lyrics: "Lyrics not available for this track." });
-             }
+             setCurrentLyrics(lyricsData);
          }
       } catch (err) {
          if (active) setCurrentLyrics({ hasTimestamps: false, lyrics: "Error fetching lyrics." });
@@ -919,6 +924,13 @@ function App() {
             }}
             onPlay={() => setIsPlaying(true)}
             onPause={() => setIsPlaying(false)}
+            onError={() => {
+              // Direct CDN stream failed; seamlessly fallback to backend proxy stream
+              if (streamUrl && !streamUrl.includes('/api/proxy_stream') && !streamUrl.startsWith('blob:')) {
+                console.warn("Direct stream failed; falling back to proxy stream");
+                setStreamUrl(`${API_BASE}/api/proxy_stream?url=${encodeURIComponent(streamUrl)}`);
+              }
+            }}
           />
         )}
       </div>
