@@ -4,7 +4,7 @@ import Library from './Library.jsx';
 import { fetchLyricsClient } from './utils/lyrics.js';
 import { saveTrackToDB, getTrackFromDB, getAllSavedTracks, deleteTrackFromDB } from './utils/db.js';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
+const API_BASE = import.meta.env.VITE_API_BASE || 'https://patchwork-photo-salad.ngrok-free.dev';
 
 const customFetch = (url, options = {}) => {
   return fetch(url, {
