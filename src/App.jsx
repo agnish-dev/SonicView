@@ -3,6 +3,8 @@ import { Music, ArrowLeft, Play, Activity, RefreshCw, Pause, SkipBack, SkipForwa
 import Library from './Library.jsx';
 import { fetchLyricsClient } from './utils/lyrics.js';
 import { saveTrackToDB, getTrackFromDB, getAllSavedTracks, deleteTrackFromDB } from './utils/db.js';
+import { searchYouTubeMusic, fetchRegionalTopSongsClient, fetchRadioRecommendationsClient, fetchSearchSuggestionsClient } from './utils/ytClient.js';
+import { synthesizeMusicDNA } from './utils/dnaAnalyzer.js';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'https://patchwork-photo-salad.ngrok-free.dev';
 
@@ -216,7 +218,7 @@ function GlobalPlayer({ track, streamUrl, isLoading, isPlaying, currentTime, dur
         <div className="pill-audio">
           {isLoading ? (
             <div className="spinner" style={{width: '24px', height: '24px', margin: '0 2rem'}}></div>
-          ) : streamUrl ? (
+          ) : (streamUrl || track?.id) ? (
             <div onClick={e => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flex: 1, width: '100%' }}>
               <div className="pill-controls">
                 <button className="control-btn" onClick={onPrev}><SkipBack size={18} fill="currentColor" /></button>
@@ -373,6 +375,14 @@ function App() {
   const fetchRegionalSongs = async (language) => {
     setIsRegionalLoading(true);
     try {
+      // 1. Direct YouTube Music Catalog fetch (100% Client-Side, Zero Server)
+      const clientSongs = await fetchRegionalTopSongsClient(language);
+      if (clientSongs && clientSongs.length > 0) {
+        setRegionalSongs(clientSongs);
+        return;
+      }
+      
+      // 2. Fallback to API_BASE if available
       const res = await customFetch(`${API_BASE}/api/regional-top?language=${encodeURIComponent(language)}`);
       if (res.ok) {
         const data = await res.json();
@@ -402,6 +412,8 @@ function App() {
   const audioRef = useRef(null);
   const blobUrlRef = useRef(null);
   const canvasVideoRef = useRef(null);
+  const ytPlayerRef = useRef(null);
+  const ytPollIntervalRef = useRef(null);
   const [streamUrl, setStreamUrl] = useState(null);
   const [canvasVideoUrl, setCanvasVideoUrl] = useState(null);
   const [isLoadingStream, setIsLoadingStream] = useState(false);
@@ -410,6 +422,110 @@ function App() {
   const [duration, setDuration] = useState(0);
   const [skipSegments, setSkipSegments] = useState([]);
   const [audioQuality, setAudioQuality] = useState(localStorage.getItem('sonicview_quality') || 'high');
+
+  // Load official YouTube IFrame API for zero-server client-side playback
+  useEffect(() => {
+    if (!window.YT) {
+      const tag = document.createElement('script');
+      tag.src = "https://www.youtube.com/iframe_api";
+      const firstScriptTag = document.getElementsByTagName('script')[0];
+      if (firstScriptTag && firstScriptTag.parentNode) {
+        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+      } else {
+        document.head.appendChild(tag);
+      }
+    }
+  }, []);
+
+  const initOrUpdateYouTubePlayer = (videoId) => {
+    if (!videoId) return;
+
+    if (audioRef.current) {
+      try { audioRef.current.pause(); } catch (e) {}
+    }
+
+    const startPlayer = () => {
+      if (!window.YT || !window.YT.Player) {
+        setTimeout(startPlayer, 200);
+        return;
+      }
+
+      try {
+        if (ytPlayerRef.current && typeof ytPlayerRef.current.loadVideoById === 'function') {
+          ytPlayerRef.current.loadVideoById(videoId);
+          ytPlayerRef.current.playVideo();
+          setIsPlaying(true);
+        } else {
+          ytPlayerRef.current = new window.YT.Player('yt-player-container', {
+            height: '1',
+            width: '1',
+            videoId: videoId,
+            playerVars: {
+              autoplay: 1,
+              controls: 0,
+              playsinline: 1,
+              disablekb: 1,
+              fs: 0
+            },
+            events: {
+              onReady: (e) => {
+                try {
+                  e.target.playVideo();
+                  setIsPlaying(true);
+                  const d = e.target.getDuration();
+                  if (d && !isNaN(d)) setDuration(d);
+                } catch (err) {}
+              },
+              onStateChange: (e) => {
+                if (e.data === 1) { // PLAYING
+                  setIsPlaying(true);
+                  try {
+                    const d = e.target.getDuration();
+                    if (d && !isNaN(d)) setDuration(d);
+                  } catch (err) {}
+                } else if (e.data === 2) { // PAUSED
+                  setIsPlaying(false);
+                } else if (e.data === 0) { // ENDED
+                  setIsPlaying(false);
+                  handleNextTrack();
+                }
+              }
+            }
+          });
+        }
+      } catch (err) {
+        console.error("YouTube Player error:", err);
+      }
+    };
+
+    startPlayer();
+  };
+
+  // Poll time from YouTube player when in zero-server client mode
+  useEffect(() => {
+    if (ytPollIntervalRef.current) clearInterval(ytPollIntervalRef.current);
+    
+    if (!streamUrl && currentPlayingTrack) {
+      ytPollIntervalRef.current = setInterval(() => {
+        if (ytPlayerRef.current && typeof ytPlayerRef.current.getCurrentTime === 'function') {
+          try {
+            const t = ytPlayerRef.current.getCurrentTime();
+            if (t !== undefined && !isNaN(t)) {
+              setCurrentTime(t);
+            }
+            const d = ytPlayerRef.current.getDuration();
+            if (d && !isNaN(d) && d > 0) {
+              setDuration(d);
+            }
+          } catch (e) {}
+        }
+      }, 250);
+    }
+
+    return () => {
+      if (ytPollIntervalRef.current) clearInterval(ytPollIntervalRef.current);
+    };
+  }, [streamUrl, currentPlayingTrack]);
 
   useEffect(() => {
     localStorage.setItem('sonicview_quality', audioQuality);
@@ -423,6 +539,9 @@ function App() {
       setIsPlaying(false);
       setCurrentTime(0);
       setDuration(0);
+      if (ytPlayerRef.current && typeof ytPlayerRef.current.stopVideo === 'function') {
+        try { ytPlayerRef.current.stopVideo(); } catch (e) {}
+      }
       return;
     }
     
@@ -434,35 +553,62 @@ function App() {
       setIsLoadingStream(true);
       setStreamUrl(null);
       setCanvasVideoUrl(null);
-      try {
-        const res = await customFetch(`${API_BASE}/api/stream?video_id=${currentPlayingTrack.id}&title=${encodeURIComponent(currentPlayingTrack.title)}&artist=${encodeURIComponent(currentPlayingTrack.artist)}&quality=${audioQuality}&_t=${Date.now()}`);
-        if (!res.ok) throw new Error("Stream fetch failed");
-        const data = await res.json();
+
+      // 1. If playing an offline saved track directly from IndexedDB
+      if (currentPlayingTrack.isOffline && currentPlayingTrack.audioUrl) {
         if (active) {
-          const finalUrl = data.stream_url.startsWith('/api/') ? API_BASE + data.stream_url : data.stream_url;
-          
-          if (finalUrl.includes('ngrok-free.dev')) {
-            const audioRes = await customFetch(finalUrl);
-            const blob = await audioRes.blob();
-            const objectUrl = URL.createObjectURL(blob);
-            if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
-            blobUrlRef.current = objectUrl;
-            setStreamUrl(objectUrl);
-          } else {
-            setStreamUrl(finalUrl);
+          setStreamUrl(currentPlayingTrack.audioUrl);
+          setIsLoadingStream(false);
+        }
+        return;
+      }
+
+      // 2. Try fetching direct CDN stream from backend (if available or hosted)
+      let directStreamFound = false;
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000);
+        const res = await customFetch(
+          `${API_BASE}/api/stream?video_id=${currentPlayingTrack.id}&title=${encodeURIComponent(currentPlayingTrack.title)}&artist=${encodeURIComponent(currentPlayingTrack.artist)}&quality=${audioQuality}&_t=${Date.now()}`,
+          { signal: controller.signal }
+        );
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          const data = await res.json();
+          if (active && data.stream_url) {
+            directStreamFound = true;
+            const finalUrl = data.stream_url.startsWith('/api/') ? API_BASE + data.stream_url : data.stream_url;
+            
+            if (finalUrl.includes('ngrok-free.dev')) {
+              const audioRes = await customFetch(finalUrl);
+              const blob = await audioRes.blob();
+              const objectUrl = URL.createObjectURL(blob);
+              if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+              blobUrlRef.current = objectUrl;
+              setStreamUrl(objectUrl);
+            } else {
+              setStreamUrl(finalUrl);
+            }
+            
+            if (data.video_url) {
+              setCanvasVideoUrl(data.video_url);
+            }
+            
+            setSkipSegments(data.skip_segments || []);
           }
-          
-          if (data.video_url) {
-            setCanvasVideoUrl(data.video_url);
-          }
-          
-          setSkipSegments(data.skip_segments || []);
         }
       } catch (err) {
-        console.error(err);
-      } finally {
-        if (active) setIsLoadingStream(false);
+        // Backend offline / laptop is off - fallback to zero-server YouTube Player seamlessly!
       }
+
+      // 3. Fallback: Zero-Server YouTube Player (100% Client-Side on User's Mobile)
+      if (!directStreamFound && active) {
+        setStreamUrl(null);
+        initOrUpdateYouTubePlayer(currentPlayingTrack.id);
+      }
+
+      if (active) setIsLoadingStream(false);
     };
 
     fetchFullAudio();
@@ -470,11 +616,20 @@ function App() {
   }, [currentPlayingTrack, audioQuality]);
 
   const togglePlay = () => {
-    if (!audioRef.current) return;
-    if (isPlaying) {
-      audioRef.current.pause();
-    } else {
-      audioRef.current.play();
+    if (streamUrl && audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.pause();
+      } else {
+        audioRef.current.play().catch(() => {});
+      }
+    } else if (ytPlayerRef.current) {
+      try {
+        if (isPlaying && typeof ytPlayerRef.current.pauseVideo === 'function') {
+          ytPlayerRef.current.pauseVideo();
+        } else if (!isPlaying && typeof ytPlayerRef.current.playVideo === 'function') {
+          ytPlayerRef.current.playVideo();
+        }
+      } catch (e) {}
     }
     setIsPlaying(!isPlaying);
   };
@@ -501,7 +656,24 @@ function App() {
 
   const handleSeek = (val) => {
     setCurrentTime(val);
-    if (audioRef.current) audioRef.current.currentTime = val;
+    if (streamUrl && audioRef.current) {
+      audioRef.current.currentTime = val;
+    } else if (ytPlayerRef.current && typeof ytPlayerRef.current.seekTo === 'function') {
+      try {
+        ytPlayerRef.current.seekTo(val, true);
+      } catch (e) {}
+    }
+  };
+
+  const handleClosePlayer = () => {
+    if (audioRef.current) {
+      try { audioRef.current.pause(); } catch (e) {}
+    }
+    if (ytPlayerRef.current && typeof ytPlayerRef.current.stopVideo === 'function') {
+      try { ytPlayerRef.current.stopVideo(); } catch (e) {}
+    }
+    setCurrentPlayingTrack(null);
+    setIsPlaying(false);
   };
 
   const handleOpenFullPlayer = () => {
@@ -590,7 +762,7 @@ function App() {
   };
 
   const handleSearch = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     if (!query.trim()) return;
     
     setIsSearching(true);
@@ -598,12 +770,24 @@ function App() {
     setError('');
     
     try {
+      // 1. Direct YouTube Music catalog search (100% Client-Side, Zero Server)
+      const directSongs = await searchYouTubeMusic(query.trim());
+      if (directSongs && directSongs.length > 0) {
+        setSearchResults(directSongs);
+        setIsSearching(false);
+        return;
+      }
+      
+      // 2. Fallback to API_BASE
       const res = await customFetch(`${API_BASE}/api/search?q=${encodeURIComponent(query)}`);
-      if (!res.ok) throw new Error("Search failed");
-      const data = await res.json();
-      setSearchResults(data);
+      if (res.ok) {
+        const data = await res.json();
+        setSearchResults(data);
+      } else {
+        throw new Error("Search failed");
+      }
     } catch (err) {
-      setError("Failed to connect to the music database. Is the backend running?");
+      setError("No tracks found. Please try another search term.");
     } finally {
       setIsSearching(false);
     }
@@ -617,6 +801,21 @@ function App() {
     
     if (val.trim().length > 1) {
       searchTimeout.current = setTimeout(async () => {
+        // 1. Direct real-time YouTube suggestions (100% Client-Side)
+        try {
+          const directSuggestions = await fetchSearchSuggestionsClient(val);
+          if (directSuggestions && directSuggestions.length > 0) {
+            setSuggestions(directSuggestions.map(s => ({
+              id: 'suggest_' + s,
+              title: s,
+              artist: 'Search YouTube Music'
+            })));
+            setShowSuggestions(true);
+            return;
+          }
+        } catch (e) {}
+
+        // 2. Fallback to backend suggestions
         if (abortControllerRef.current) {
           abortControllerRef.current.abort();
         }
@@ -631,12 +830,8 @@ function App() {
             setSuggestions(data.slice(0, 20));
             setShowSuggestions(true);
           }
-        } catch (err) {
-          if (err.name !== 'AbortError') {
-            console.error("Search suggestion error:", err);
-          }
-        }
-      }, 500);
+        } catch (err) {}
+      }, 300);
     } else {
       if (abortControllerRef.current) abortControllerRef.current.abort();
       setSuggestions([]);
@@ -649,50 +844,42 @@ function App() {
     setCurrentPlayingTrack(track);
     setIsAnalyzing(true);
     setError('');
-    setAnalysisResult(null);
-    setRecommendations([]);
-    setLanguageRecommendations([]);
     
+    // 1. Instant client-side DNA synthesis (0 latency, 0 server needed!)
+    const clientDNA = synthesizeMusicDNA(track);
+    setAnalysisResult(clientDNA);
+
+    // 2. Fetch Up-Next Radio Recommendations directly from YouTube Music catalog
     try {
+      const radioTracks = await fetchRadioRecommendationsClient(track.id);
+      if (radioTracks && radioTracks.length > 0) {
+        setRecommendations(radioTracks.slice(0, 15));
+        setLanguageRecommendations(radioTracks.slice(15, 30));
+      }
+    } catch (e) {
+      console.warn("Direct radio recommendations error:", e);
+    } finally {
+      setIsAnalyzing(false);
+    }
+
+    // 3. Optional background server upgrade (if laptop/cloud happens to be running)
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2500);
       const analyzeRes = await customFetch(`${API_BASE}/api/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(track)
+        body: JSON.stringify(track),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
       
-      if (!analyzeRes.ok) throw new Error("Failed to analyze track");
-      const analysisData = await analyzeRes.json();
-      setAnalysisResult(analysisData);
-      
-      const tags = (analysisData.aesthetic_tags || []).join(" ");
-      const range = analysisData.timeline_range || "";
-      const language = analysisData.language || 'Bollywood';
-      
-      const localSeed = `${tags} ${language} songs ${range}`;
-      const globalSeed = `${tags} international English songs ${range}`;
-      
-      const dnaString = encodeURIComponent(JSON.stringify(analysisData.stats) + " | " + tags + " | Mood: " + (analysisData.mood || ""));
-      const titleStr = encodeURIComponent(track.title);
-      const artistStr = encodeURIComponent(track.artist);
-      const targetYearStr = analysisResult?.release_time || analysisData?.release_time || '';
-      
-      const recRes = await customFetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(globalSeed)}&target_year=${targetYearStr}&title=${titleStr}&artist=${artistStr}&dna=${dnaString}`);
-      if (recRes.ok) {
-        const recData = await recRes.json();
-        setRecommendations(recData);
+      if (analyzeRes.ok) {
+        const analysisData = await analyzeRes.json();
+        setAnalysisResult(analysisData);
       }
-      
-      // 3. Fetch Genre/Language specific recommendations using the AI detected language
-      const langRes = await customFetch(`${API_BASE}/api/recommend?seed=${encodeURIComponent(localSeed)}&target_year=${targetYearStr}&title=${titleStr}&artist=${artistStr}&dna=${dnaString}`);
-      if (langRes.ok) {
-        const langData = await langRes.json();
-        setLanguageRecommendations(langData);
-      }
-      
     } catch (err) {
-      setError("Analysis failed. The backend might still be installing dependencies.");
-    } finally {
-      setIsAnalyzing(false);
+      // Graceful silent fallback to clientDNA - zero error shown to user!
     }
   };
 
@@ -728,6 +915,32 @@ function App() {
     setRecommendations([]);
     setLanguageRecommendations([]);
     setError('');
+  };
+
+  const fetchMoreGlobal = async () => {
+    if (!selectedTrack?.id) return [];
+    try {
+      const more = await fetchRadioRecommendationsClient(selectedTrack.id);
+      if (more && more.length > 0) {
+        const nextBatch = more.slice(10, 25);
+        setRecommendations(prev => [...prev, ...nextBatch]);
+        return nextBatch;
+      }
+    } catch (e) {}
+    return [];
+  };
+
+  const fetchMoreGenre = async () => {
+    if (!selectedTrack?.id) return [];
+    try {
+      const more = await fetchRadioRecommendationsClient(selectedTrack.id);
+      if (more && more.length > 0) {
+        const nextBatch = more.slice(25, 40);
+        setLanguageRecommendations(prev => [...prev, ...nextBatch]);
+        return nextBatch;
+      }
+    } catch (e) {}
+    return [];
   };
 
   const handleNextTrack = () => {
@@ -785,10 +998,6 @@ function App() {
     if (list && idx > 0) {
        setCurrentPlayingTrack(list[idx - 1]);
     }
-  };
-
-  const handleClosePlayer = () => {
-    setCurrentPlayingTrack(null);
   };
 
   return (
@@ -864,7 +1073,13 @@ function App() {
                   <div key={track.id} className="suggestion-item" onClick={() => {
                     setQuery(track.title);
                     setShowSuggestions(false);
-                    handleTrackSelect(track);
+                    if (track.id?.startsWith('suggest_')) {
+                      searchYouTubeMusic(track.title).then(songs => {
+                        if (songs && songs.length > 0) setSearchResults(songs);
+                      });
+                    } else {
+                      handleTrackSelect(track);
+                    }
                   }}>
                     <img src={track.art} alt={track.title} className="suggestion-art" />
                     <div className="suggestion-info">
@@ -933,6 +1148,22 @@ function App() {
             }}
           />
         )}
+      </div>
+
+      {/* Hidden YouTube IFrame container for 100% zero-server client playback */}
+      <div 
+        style={{ 
+          position: 'fixed', 
+          bottom: -9999, 
+          left: -9999, 
+          width: '1px', 
+          height: '1px', 
+          opacity: 0, 
+          pointerEvents: 'none',
+          zIndex: -1 
+        }}
+      >
+        <div id="yt-player-container" />
       </div>
 
       {/* Global Player */}
@@ -1117,7 +1348,13 @@ function App() {
                             <div key={track.id} className="suggestion-item" onClick={() => {
                               setQuery(track.title);
                               setShowSuggestions(false);
-                              handleTrackSelect(track);
+                              if (track.id?.startsWith('suggest_')) {
+                                searchYouTubeMusic(track.title).then(songs => {
+                                  if (songs && songs.length > 0) setSearchResults(songs);
+                                });
+                              } else {
+                                handleTrackSelect(track);
+                              }
                             }}>
                               <img src={track.art} alt={track.title} className="suggestion-art" />
                               <div className="suggestion-info">
