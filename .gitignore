@@ -25,3 +25,8 @@ dist-ssr
 .env
 dev-dist
 *.exe
+# Android build artifacts
+android/.gradle
+android/app/build
+android/build
+*.apk
